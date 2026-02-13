@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAccount } from 'wagmi';
-import { getApiUrl } from '../config/api';
 
 export interface Token {
   tokenAddress: string;

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAccount, useChainId } from 'wagmi';
-import { getApiUrl } from '../config/api';
 
 export interface ResourceLockBalance {
   balance: string;

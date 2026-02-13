@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useResourceLocks } from './useResourceLocks';
-import { formatUnits } from 'viem';
-import { getApiUrl } from '../config/api';
 
 export interface Token {
   tokenAddress: string;
