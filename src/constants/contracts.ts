@@ -60,6 +60,16 @@ export const ERC20_ABI = [
     outputs: [{ name: '', type: 'bool' }],
     type: 'function',
   },
+  {
+    constant: false,
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
+  },
 ] as const;
 
 // Helper function to get chain configuration
