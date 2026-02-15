@@ -432,7 +432,7 @@ export default function BalancePage() {
               {tokenType === "erc20" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Deposit Token Address
+                    Input Token Address
                   </label>
                   <select
                     value={depositTokenAddress}
@@ -459,7 +459,7 @@ export default function BalancePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Output Token Amount
+                    Minimum Output Amount
                   </label>
                   <input
                     type="text"

@@ -530,18 +530,6 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
             <span className="text-sm font-medium text-white">
               Intent
             </span>
-            <span
-              className={`px-2 py-1 rounded text-xs font-medium ${
-                isExpired
-                  ? 'bg-red-900 text-red-300'
-                  : 'bg-green-900 text-green-300'
-              }`}
-            >
-              {isExpired ? 'Expired' : 'Active'}
-            </span>
-            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
-              Chain {compact.chainId}
-            </span>
             {/* Intent Status Badge */}
             <span className={`px-2 py-1 rounded text-xs font-medium ${overallStatus.color}`}>
               {overallStatus.label}
@@ -636,6 +624,26 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
 
           {/* Compact Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div>
+              <span className="text-gray-500">Status:</span>
+              <div className="mt-1">
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    isExpired
+                      ? 'bg-red-900 text-red-300'
+                      : 'bg-green-900 text-green-300'
+                  }`}
+                >
+                  {isExpired ? 'Expired' : 'Active'}
+                </span>
+              </div>
+            </div>
+            <div>
+              <span className="text-gray-500">Chain ID:</span>
+              <div className="font-mono text-gray-300 mt-1">
+                {compact.chainId}
+              </div>
+            </div>
             <div>
               <span className="text-gray-500">Arbiter:</span>
               <div className="font-mono text-gray-300">
