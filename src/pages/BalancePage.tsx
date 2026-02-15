@@ -412,22 +412,20 @@ export default function BalancePage() {
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Output Token
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={outputTokenAddress}
                     onChange={(e) => setOutputTokenAddress(e.target.value)}
-                    placeholder="0x..."
-                    className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-gray-300 focus:outline-none transition-colors ${
-                      outputTokenAddress && !isValid && !isLoadingToken
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-gray-700 focus:border-[#00ff00]"
-                    }`}
-                  />
-                  {tokenType === "erc20" && isValid && symbol && (
-                    <div className="mt-1 text-xs text-gray-400">
-                      Token: {symbol}
-                    </div>
-                  )}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                  >
+                    {FAUCET_TOKENS.map((token) => (
+                      <option key={token.address} value={token.address}>
+                        {token.symbol}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-1 text-xs text-gray-400 font-mono">
+                    {outputTokenAddress}
+                  </div>
                 </div>
               )}
 
@@ -436,21 +434,20 @@ export default function BalancePage() {
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Deposit Token Address
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={depositTokenAddress}
                     onChange={(e) => setDepositTokenAddress(e.target.value)}
-                    placeholder="0x..."
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  />
-                  {tokenType === "erc20" &&
-                    isValidDeposit &&
-                    depositSymbol &&
-                    !isLoadingDeposit && (
-                      <div className="mt-1 text-xs text-gray-400">
-                        Deposit Token: {depositSymbol}
-                      </div>
-                    )}
+                  >
+                    {FAUCET_TOKENS.map((token) => (
+                      <option key={token.address} value={token.address}>
+                        {token.symbol}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-1 text-xs text-gray-400 font-mono">
+                    {depositTokenAddress}
+                  </div>
                 </div>
               )}
 
