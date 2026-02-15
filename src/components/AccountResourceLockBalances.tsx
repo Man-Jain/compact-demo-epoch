@@ -10,6 +10,7 @@ import { useAccount, useChainId } from 'wagmi';
 import { ForcedWithdrawalDialog } from './ForcedWithdrawalDialog';
 import { InitiateForcedWithdrawalDialog } from './InitiateForcedWithdrawalDialog';
 import { useCompact } from '../hooks/useCompact';
+import { useIntentStatus } from '../hooks/useIntentStatus';
 
 const AccountResourceLockBalances: React.FC = () => {
   const { accountData, isLoading, error, refetch } =
@@ -493,8 +494,38 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
   isExpanded,
   onToggleExpanded,
 }) => {
+  const { address } = useAccount();
   const isExpired =
     new Date(parseInt(compact.compact.expires) * 1000) < new Date();
+
+  // Fetch intent status with auto-refresh every 5 seconds
+  const { statuses, isLoading: isStatusLoading, error: statusError } = useIntentStatus(
+    address,
+    compact.compact.nonce,
+    true, // enabled
+    true, // autoRefresh
+    5000  // 5 second refresh interval
+  );
+
+  // Determine overall status
+  const getOverallStatus = () => {
+    if (isStatusLoading) return { label: 'Loading...', color: 'bg-blue-900 text-blue-300' };
+    if (statusError) return { label: 'Error', color: 'bg-red-900 text-red-300' };
+    if (!statuses || statuses.length === 0) return { label: 'Pending', color: 'bg-yellow-900 text-yellow-300' };
+    
+    // Check if all transactions are successful
+    const allSuccess = statuses.every(s => s.status === 'success');
+    if (allSuccess) return { label: 'Completed', color: 'bg-green-900 text-green-300' };
+    
+    // Check if any transaction failed
+    const anyFailed = statuses.some(s => s.status === 'failed' || s.status === 'reverted');
+    if (anyFailed) return { label: 'Failed', color: 'bg-red-900 text-red-300' };
+    
+    // Otherwise, in progress
+    return { label: 'In Progress', color: 'bg-blue-900 text-blue-300' };
+  };
+
+  const overallStatus = getOverallStatus();
 
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-600 p-3">
@@ -516,6 +547,10 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
             <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
               Chain {compact.chainId}
             </span>
+            {/* Intent Status Badge */}
+            <span className={`px-2 py-1 rounded text-xs font-medium ${overallStatus.color}`}>
+              {overallStatus.label}
+            </span>
           </div>
 
           <div className="text-xs text-gray-400">
@@ -529,6 +564,13 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
           <div className="text-xs text-gray-400 font-mono break-all">
             Hash: {compact.hash.slice(0, 10)}...
           </div>
+
+          {/* Show transaction count if available */}
+          {statuses && statuses.length > 0 && (
+            <div className="text-xs text-gray-400 mt-1">
+              Transactions: {statuses.length}
+            </div>
+          )}
         </div>
 
         <button
@@ -540,7 +582,50 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
       </div>
 
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-gray-600">
+        <div className="mt-3 pt-3 border-t border-gray-600 space-y-4">
+          {/* Intent Status Transactions */}
+          {statuses && statuses.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-300 mb-2">
+                Intent Transactions:
+              </div>
+              <div className="space-y-2">
+                {statuses.map((tx, index) => (
+                  <div
+                    key={index}
+                    className="p-2 bg-gray-700 rounded border border-gray-600"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-400">
+                        Transaction {index + 1}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          tx.status === 'success'
+                            ? 'bg-green-500/20 text-green-400'
+                            : tx.status === 'failed' || tx.status === 'reverted'
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'bg-yellow-500/20 text-yellow-400'
+                        }`}
+                      >
+                        {tx.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      <span className="text-gray-500">Chain:</span>{' '}
+                      {tx.chainId}
+                    </div>
+                    <div className="text-xs text-gray-400 font-mono break-all">
+                      <span className="text-gray-500">Hash:</span>{' '}
+                      {tx.transactionHash}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Compact Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-gray-500">Arbiter:</span>
