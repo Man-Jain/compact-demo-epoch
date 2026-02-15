@@ -7,7 +7,7 @@ import { useERC20 } from "../hooks/useERC20";
 import { useCompact } from "../hooks/useCompact";
 import { useCreateAllocation } from "../hooks/useCreateAllocation";
 import { useChainConfig } from "../hooks/use-chain-config";
-import { getChainName } from "../utils/chains";
+import { getChainName, getBlockExplorerTxUrl } from "../utils/chains";
 import CompactsList from "../components/CompactsList";
 import AccountResourceLockBalances from "../components/AccountResourceLockBalances";
 import { WalletConnect } from "../components/WalletConnect";
@@ -594,39 +594,53 @@ export default function BalancePage() {
                   <div className="text-sm font-medium text-gray-300">
                     Transaction Status:
                   </div>
-                  {intentStatus.map((tx, index) => (
-                    <div
-                      key={index}
-                      className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-gray-500">Status</div>
-                        <div
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            tx.status === "success"
-                              ? "bg-green-500/20 text-green-400"
-                              : "bg-yellow-500/20 text-yellow-400"
-                          }`}
-                        >
-                          {tx.status}
+                  {intentStatus.map((tx, index) => {
+                    const explorerUrl = getBlockExplorerTxUrl(tx.chainId, tx.transactionHash);
+                    return (
+                      <div
+                        key={index}
+                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-500">Status</div>
+                          <div
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              tx.status === "success"
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-yellow-500/20 text-yellow-400"
+                            }`}
+                          >
+                            {tx.status}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">
+                            Transaction Hash
+                          </div>
+                          <div className="text-gray-200 break-all font-mono text-sm">
+                            {explorerUrl ? (
+                              <a
+                                href={explorerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#00ff00] hover:text-[#00dd00] underline transition-colors"
+                              >
+                                {tx.transactionHash}
+                              </a>
+                            ) : (
+                              tx.transactionHash
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">
+                            Chain ID
+                          </div>
+                          <div className="text-gray-200">{tx.chainId}</div>
                         </div>
                       </div>
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">
-                          Transaction Hash
-                        </div>
-                        <div className="text-gray-200 break-all font-mono text-sm">
-                          {tx.transactionHash}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">
-                          Chain ID
-                        </div>
-                        <div className="text-gray-200">{tx.chainId}</div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

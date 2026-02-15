@@ -11,6 +11,7 @@ import { ForcedWithdrawalDialog } from './ForcedWithdrawalDialog';
 import { InitiateForcedWithdrawalDialog } from './InitiateForcedWithdrawalDialog';
 import { useCompact } from '../hooks/useCompact';
 import { useIntentStatus } from '../hooks/useIntentStatus';
+import { getBlockExplorerTxUrl } from '../utils/chains';
 
 const AccountResourceLockBalances: React.FC = () => {
   const { accountData, isLoading, error, refetch } =
@@ -590,37 +591,51 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
                 Intent Transactions:
               </div>
               <div className="space-y-2">
-                {statuses.map((tx, index) => (
-                  <div
-                    key={index}
-                    className="p-2 bg-gray-700 rounded border border-gray-600"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-400">
-                        Transaction {index + 1}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          tx.status === 'success'
-                            ? 'bg-green-500/20 text-green-400'
-                            : tx.status === 'failed' || tx.status === 'reverted'
-                            ? 'bg-red-500/20 text-red-400'
-                            : 'bg-yellow-500/20 text-yellow-400'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
+                {statuses.map((tx, index) => {
+                  const explorerUrl = getBlockExplorerTxUrl(tx.chainId, tx.transactionHash);
+                  return (
+                    <div
+                      key={index}
+                      className="p-2 bg-gray-700 rounded border border-gray-600"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">
+                          Transaction {index + 1}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            tx.status === 'success'
+                              ? 'bg-green-500/20 text-green-400'
+                              : tx.status === 'failed' || tx.status === 'reverted'
+                              ? 'bg-red-500/20 text-red-400'
+                              : 'bg-yellow-500/20 text-yellow-400'
+                          }`}
+                        >
+                          {tx.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        <span className="text-gray-500">Chain:</span>{' '}
+                        {tx.chainId}
+                      </div>
+                      <div className="text-xs text-gray-400 font-mono break-all">
+                        <span className="text-gray-500">Hash:</span>{' '}
+                        {explorerUrl ? (
+                          <a
+                            href={explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#00ff00] hover:text-[#00dd00] underline transition-colors"
+                          >
+                            {tx.transactionHash}
+                          </a>
+                        ) : (
+                          tx.transactionHash
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-400">
-                      <span className="text-gray-500">Chain:</span>{' '}
-                      {tx.chainId}
-                    </div>
-                    <div className="text-xs text-gray-400 font-mono break-all">
-                      <span className="text-gray-500">Hash:</span>{' '}
-                      {tx.transactionHash}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
