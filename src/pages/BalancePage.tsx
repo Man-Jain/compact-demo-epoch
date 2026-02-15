@@ -71,7 +71,6 @@ export default function BalancePage() {
     decimals,
     isValid,
     isLoading: isLoadingToken,
-    symbol,
   } = useERC20(
     tokenType === "erc20" && outputTokenAddress
       ? (outputTokenAddress as `0x${string}`)
@@ -79,7 +78,6 @@ export default function BalancePage() {
   );
 
   const {
-    symbol: depositSymbol,
     isValid: isValidDeposit,
     isLoading: isLoadingDeposit,
   } = useERC20(
