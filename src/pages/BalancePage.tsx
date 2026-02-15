@@ -54,8 +54,8 @@ export default function BalancePage() {
   const [depositTokenAddress, setDepositTokenAddress] = useState(
     "0xc04d2869665Be874881133943523723Be5782720",
   );
-  const [outputAmount, setOutputAmount] = useState("111");
-  const [inputAmount, setInputAmount] = useState("1");
+  const [outputAmount, setOutputAmount] = useState("0");
+  const [inputAmount, setInputAmount] = useState("100");
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
