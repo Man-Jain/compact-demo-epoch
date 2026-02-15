@@ -27,7 +27,7 @@ const AccountResourceLockBalances: React.FC = () => {
   // }, [accountData?.address]);
 
   // Use compacts from database instead of GraphQL registered compacts
-  const { compacts: databaseCompacts, isLoading: compactsLoading } =
+  const { compacts: databaseCompacts, isLoading: compactsLoading, refetch: refetchCompacts } =
     useCompacts(address ?? '');
 
   const [expandedBalances, setExpandedBalances] = useState<Set<string>>(
@@ -129,12 +129,12 @@ const AccountResourceLockBalances: React.FC = () => {
     return (
       <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
         <h2 className="text-xl font-bold text-white mb-4">
-          Resource Lock Balances
+          Your Intents History
         </h2>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00ff00]"></div>
           <span className="ml-3 text-gray-400">
-            Loading resource lock balances...
+            Loading intents history...
           </span>
         </div>
       </div>
@@ -145,11 +145,11 @@ const AccountResourceLockBalances: React.FC = () => {
     return (
       <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
         <h2 className="text-xl font-bold text-white mb-4">
-          Resource Lock Balances
+          Your Intents History
         </h2>
         <div className="text-center py-12">
           <div className="text-red-400 mb-2 text-lg">
-            ⚠️ Error loading resource lock balances
+            ⚠️ Error loading intents history
           </div>
           <div className="text-gray-400 text-sm mb-6">{error.message}</div>
           <button
@@ -171,14 +171,14 @@ const AccountResourceLockBalances: React.FC = () => {
     return (
       <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
         <h2 className="text-xl font-bold text-white mb-4">
-          Resource Lock Balances
+          Your Intents History
         </h2>
         <div className="text-center py-12">
           <div className="text-gray-400 mb-2 text-lg">
-            📄 No resource locks or compacts found
+            📄 No resource locks or intents found
           </div>
           <div className="text-gray-500 text-sm">
-            Resource locks and compacts will appear here once they are created
+            Resource locks and intents will appear here once they are created
           </div>
         </div>
       </div>
@@ -190,14 +190,19 @@ const AccountResourceLockBalances: React.FC = () => {
     ...Object.keys(groupedRegisteredCompacts),
   ]);
 
+  const handleRefresh = () => {
+    refetch();
+    refetchCompacts();
+  };
+
   return (
     <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white">
-          Resource Lock Balances & Database Compacts
+          Your Intents History
         </h2>
         <button
-          onClick={refetch}
+          onClick={handleRefresh}
           className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors font-medium"
         >
           Refresh
@@ -208,9 +213,6 @@ const AccountResourceLockBalances: React.FC = () => {
       <div className="space-y-8">
         {/* Resource Lock Balances */}
         <div className="space-y-4">
-          <h3 className="text-md font-semibold text-white mb-4">
-            Resource Lock Balances
-          </h3>
           <div className="max-h-96 overflow-y-auto space-y-3">
             {Array.from(allAllocators).map(
               (allocatorAddress) =>
@@ -246,9 +248,6 @@ const AccountResourceLockBalances: React.FC = () => {
 
         {/* Database Compacts */}
         <div className="space-y-4">
-          <h3 className="text-md font-semibold text-white mb-4">
-            Database Compacts
-          </h3>
           <div className="max-h-96 overflow-y-auto space-y-3">
             {Array.from(allAllocators).map(
               (groupKey) =>
@@ -534,19 +533,7 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-white">
-              Database Compact
-            </span>
-            <span
-              className={`px-2 py-1 rounded text-xs font-medium ${
-                isExpired
-                  ? 'bg-red-900 text-red-300'
-                  : 'bg-green-900 text-green-300'
-              }`}
-            >
-              {isExpired ? 'Expired' : 'Active'}
-            </span>
-            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
-              Chain {compact.chainId}
+              Intent
             </span>
             {/* Intent Status Badge */}
             <span className={`px-2 py-1 rounded text-xs font-medium ${overallStatus.color}`}>
@@ -642,6 +629,26 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
 
           {/* Compact Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div>
+              <span className="text-gray-500">Status:</span>
+              <div className="mt-1">
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    isExpired
+                      ? 'bg-red-900 text-red-300'
+                      : 'bg-green-900 text-green-300'
+                  }`}
+                >
+                  {isExpired ? 'Expired' : 'Active'}
+                </span>
+              </div>
+            </div>
+            <div>
+              <span className="text-gray-500">Chain ID:</span>
+              <div className="font-mono text-gray-300 mt-1">
+                {compact.chainId}
+              </div>
+            </div>
             <div>
               <span className="text-gray-500">Arbiter:</span>
               <div className="font-mono text-gray-300">

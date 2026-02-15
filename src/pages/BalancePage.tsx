@@ -54,8 +54,8 @@ export default function BalancePage() {
   const [depositTokenAddress, setDepositTokenAddress] = useState(
     "0xc04d2869665Be874881133943523723Be5782720",
   );
-  const [outputAmount, setOutputAmount] = useState("111");
-  const [inputAmount, setInputAmount] = useState("1");
+  const [outputAmount, setOutputAmount] = useState("0");
+  const [inputAmount, setInputAmount] = useState("100");
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
@@ -432,7 +432,7 @@ export default function BalancePage() {
               {tokenType === "erc20" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Deposit Token Address
+                    Input Token Address
                   </label>
                   <select
                     value={depositTokenAddress}
@@ -459,7 +459,7 @@ export default function BalancePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Output Token Amount
+                    Minimum Output Amount
                   </label>
                   <input
                     type="text"
@@ -550,14 +550,12 @@ export default function BalancePage() {
             </button>
           </div>
 
-          {/* Bottom Row: Resource Lock Balances and Database Compacts side by side */}
-          <div>
-            {/* Resource Lock Balances */}
-            {/* {sessionToken && ( */}
+          {/* Admin Section */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-white">Admin Section</h2>
             <div>
               <CompactsList />
             </div>
-            {/* )} */}
           </div>
 
           {/* Intent Status Section */}
