@@ -550,14 +550,12 @@ export default function BalancePage() {
             </button>
           </div>
 
-          {/* Bottom Row: Resource Lock Balances and Database Compacts side by side */}
-          <div>
-            {/* Resource Lock Balances */}
-            {/* {sessionToken && ( */}
+          {/* Admin Section */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-white">Admin Section</h2>
             <div>
               <CompactsList />
             </div>
-            {/* )} */}
           </div>
 
           {/* Intent Status Section */}
