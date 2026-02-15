@@ -27,7 +27,7 @@ const AccountResourceLockBalances: React.FC = () => {
   // }, [accountData?.address]);
 
   // Use compacts from database instead of GraphQL registered compacts
-  const { compacts: databaseCompacts, isLoading: compactsLoading } =
+  const { compacts: databaseCompacts, isLoading: compactsLoading, refetch: refetchCompacts } =
     useCompacts(address ?? '');
 
   const [expandedBalances, setExpandedBalances] = useState<Set<string>>(
@@ -190,6 +190,11 @@ const AccountResourceLockBalances: React.FC = () => {
     ...Object.keys(groupedRegisteredCompacts),
   ]);
 
+  const handleRefresh = () => {
+    refetch();
+    refetchCompacts();
+  };
+
   return (
     <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
       <div className="flex items-center justify-between mb-6">
@@ -197,7 +202,7 @@ const AccountResourceLockBalances: React.FC = () => {
           Your Intents History
         </h2>
         <button
-          onClick={refetch}
+          onClick={handleRefresh}
           className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors font-medium"
         >
           Refresh
