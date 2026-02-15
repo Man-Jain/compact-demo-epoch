@@ -80,6 +80,8 @@ export default function BalancePage() {
   const {
     isValid: isValidDeposit,
     isLoading: isLoadingDeposit,
+    balance: depositBalance,
+    symbol: depositSymbol,
   } = useERC20(
     tokenType === "erc20" && depositTokenAddress
       ? (depositTokenAddress as `0x${string}`)
@@ -446,6 +448,11 @@ export default function BalancePage() {
                   <div className="mt-1 text-xs text-gray-400 font-mono">
                     {depositTokenAddress}
                   </div>
+                  {depositBalance && depositSymbol && (
+                    <div className="mt-1 text-xs text-gray-400">
+                      Balance: {parseFloat(depositBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} {depositSymbol}
+                    </div>
+                  )}
                 </div>
               )}
 
