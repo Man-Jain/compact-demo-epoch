@@ -56,6 +56,7 @@ export default function BalancePage() {
   );
   const [outputAmount, setOutputAmount] = useState("0");
   const [inputAmount, setInputAmount] = useState("100");
+  const [destinationChainId, setDestinationChainId] = useState("84532");
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
@@ -177,7 +178,7 @@ export default function BalancePage() {
             outputAmount || "0",
             decimals ?? 18,
           ).toString(),
-          destinationChainId: chainId.toString(),
+          destinationChainId: destinationChainId,
           protocolHashIdentifier:
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
@@ -455,6 +456,22 @@ export default function BalancePage() {
                   )}
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Destination Chain
+                </label>
+                <select
+                  value={destinationChainId}
+                  onChange={(e) => setDestinationChainId(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  <option value="84532">Base Sepolia (84532)</option>
+                  <option value="11155420">Optimism Sepolia (11155420)</option>
+                  <option value="11155111">Sepolia (11155111)</option>
+                  <option value="421614">Arbitrum Sepolia (421614)</option>
+                </select>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
