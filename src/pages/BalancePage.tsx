@@ -488,7 +488,7 @@ export default function BalancePage() {
                 disabled={!isFormValid || isConfirming}
                 className="w-full py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isConfirming ? "Submitting..." : "Deposit + Register"}
+                {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
               </button>
             </div>
             <div>
