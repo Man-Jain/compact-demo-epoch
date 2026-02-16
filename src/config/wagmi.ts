@@ -1,11 +1,11 @@
 import { http } from 'wagmi';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, baseSepolia, optimismSepolia, arbitrumSepolia } from 'viem/chains';
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 
 // Configure supported chains
 const projectId = 'YOUR_PROJECT_ID'; // Get from WalletConnect Cloud
 
-export const chains = [sepolia] as const;
+export const chains = [sepolia, baseSepolia, optimismSepolia, arbitrumSepolia] as const;
 
 // Create wagmi config using RainbowKit's getDefaultConfig
 // Sepolia is set as the first chain, making it the default chain
@@ -25,4 +25,6 @@ export const config = getDefaultConfig({
 export const CHAIN_IDS = {
   SEPOLIA: sepolia.id,
   BASE_SEPOLIA: baseSepolia.id,
+  OPTIMISM_SEPOLIA: optimismSepolia.id,
+  ARBITRUM_SEPOLIA: arbitrumSepolia.id,
 } as const;
