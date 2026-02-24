@@ -1,5 +1,11 @@
-import { useMemo, useState } from "react";
-import { useAccount, useChainId, useWalletClient, useWriteContract, usePublicClient } from "wagmi";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useAccount,
+  useChainId,
+  useWalletClient,
+  useWriteContract,
+  usePublicClient,
+} from "wagmi";
 import { parseUnits } from "viem";
 import { useNotification } from "../hooks/useNotification";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
@@ -10,10 +16,11 @@ import { useChainConfig } from "../hooks/use-chain-config";
 import { getChainName, getBlockExplorerTxUrl } from "../utils/chains";
 import CompactsList from "../components/CompactsList";
 import AccountResourceLockBalances from "../components/AccountResourceLockBalances";
+import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
-import { EpochIntentSDK } from "@epoch-protocol/epoch-intents-sdk";
-import { TaskType } from "@epoch-protocol/epoch-commons-sdk";
+import { EpochIntentSDK, TaskType } from "@epoch-protocol/epoch-intents-sdk";
 import { ERC20_ABI } from "../constants/contracts";
+import { getTokensForChain, getChainsFromGraph } from "../config/web3";
 
 interface IntentTransactionStatus {
   status: string;
@@ -22,19 +29,6 @@ interface IntentTransactionStatus {
 }
 
 type TokenType = "native" | "erc20";
-
-// Supported tokens for faucet
-const FAUCET_TOKENS = [
-  { symbol: "USDC", address: "0x2BB4FfD7E2c6D432b697554Efd77fA13bdbefd69", decimals: 18 },
-  { symbol: "DAI", address: "0xc30f1Ce05d1434d484E9A47283aA925fc8A8699a", decimals: 18 },
-  { symbol: "USDT", address: "0xc04d2869665Be874881133943523723Be5782720", decimals: 18 },
-  { symbol: "WETH", address: "0x7946dd86eE310D0aC16804A37787289Fa5b88A8A", decimals: 18 },
-  { symbol: "WBTC", address: "0x9b2a2754a9182fD65360E23afCDf3BeFF51796E9", decimals: 18 },
-  { symbol: "PENGU", address: "0xEA7dC9849206Ce73b11c465d37b85eC06B11Cf2C", decimals: 18 },
-  { symbol: "OSWALD", address: "0xB588418c0f90F07Bc9587d0050845a90C23C7502", decimals: 18 },
-  { symbol: "KICK", address: "0x512Ee6Bd7A4be5Ba4796F15Df080c4D0F89a38eD", decimals: 18 },
-  { symbol: "FERB", address: "0x145e03A80c19ad1b9d0429d06b6d52707de724A0", decimals: 18 },
-] as const;
 
 export default function BalancePage() {
   const chainId = useChainId();
@@ -48,39 +42,77 @@ export default function BalancePage() {
   const { writeContractAsync } = useWriteContract();
 
   const [tokenType, setTokenType] = useState<TokenType>("erc20");
-  const [outputTokenAddress, setOutputTokenAddress] = useState(
-    "0x7946dd86eE310D0aC16804A37787289Fa5b88A8A",
-  );
-  const [depositTokenAddress, setDepositTokenAddress] = useState(
-    "0xc04d2869665Be874881133943523723Be5782720",
-  );
+  const [outputTokenAddress, setOutputTokenAddress] = useState("");
+  const [depositTokenAddress, setDepositTokenAddress] = useState("");
   const [outputAmount, setOutputAmount] = useState("0");
   const [inputAmount, setInputAmount] = useState("100");
-  const [destinationChainId, setDestinationChainId] = useState("84532");
+  const [destinationChainId, setDestinationChainId] = useState("");
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
   >(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
+  // Tokens for current (source) chain; deposit and faucet use this
+  const graphTokens = useMemo(
+    () => getTokensForChain(chainId),
+    [chainId],
+  );
+  const destinationChains = useMemo(
+    () => getChainsFromGraph(chainId, { excludeCurrentChain: true }),
+    [chainId],
+  );
+  // Output token options = tokens on the selected destination chain
+  const outputTokenOptions = useMemo(() => {
+    if (!destinationChainId) return [];
+    const id = parseInt(destinationChainId, 10);
+    if (Number.isNaN(id)) return [];
+    return getTokensForChain(id);
+  }, [destinationChainId]);
+
+  // Sync deposit and faucet token when source chain / graph tokens change
+  useEffect(() => {
+    if (graphTokens.length === 0) return;
+    const first = graphTokens[0];
+    const hasDeposit = graphTokens.some((t) => t.address === depositTokenAddress);
+    const hasFaucet = graphTokens.some((t) => t.address === faucetToken);
+    if (!depositTokenAddress || !hasDeposit) setDepositTokenAddress(first.address);
+    if (!faucetToken || !hasFaucet) setFaucetToken(first.address);
+  }, [chainId, graphTokens]);
+
+  // Sync output token when destination chain (and thus outputTokenOptions) changes
+  useEffect(() => {
+    if (outputTokenOptions.length === 0) return;
+    const hasOutput = outputTokenOptions.some((t) => t.address === outputTokenAddress);
+    if (!outputTokenAddress || !hasOutput) {
+      setOutputTokenAddress(outputTokenOptions[0].address);
+    }
+  }, [destinationChainId, outputTokenOptions]);
+
+  useEffect(() => {
+    if (destinationChains.length === 0) return;
+    const currentInList = destinationChains.some(
+      (c) => c.chainId.toString() === destinationChainId
+    );
+    if (!destinationChainId || !currentInList) {
+      setDestinationChainId(destinationChains[0].chainId.toString());
+    }
+  }, [chainId, destinationChains]);
+
   // Faucet state
-  const [faucetToken, setFaucetToken] = useState<string>(FAUCET_TOKENS[0].address);
+  const [faucetToken, setFaucetToken] = useState<string>("");
   const [faucetAmount, setFaucetAmount] = useState("100");
   const [isMinting, setIsMinting] = useState(false);
 
-  const {
-    decimals,
-    isValid,
-    isLoading: isLoadingToken,
-  } = useERC20(
-    tokenType === "erc20" && outputTokenAddress
-      ? (outputTokenAddress as `0x${string}`)
-      : undefined,
+  // Output token lives on destination chain; use graph data, not useERC20 (which reads current chain)
+  const selectedOutputToken = outputTokenOptions.find(
+    (t) => t.address === outputTokenAddress
   );
 
   const {
     isValid: isValidDeposit,
     isLoading: isLoadingDeposit,
+    decimals: depositDecimals,
     balance: depositBalance,
     symbol: depositSymbol,
   } = useERC20(
@@ -125,15 +157,17 @@ export default function BalancePage() {
     if (!inputAmount || isNaN(Number(inputAmount))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
     if (tokenType === "erc20") {
-      if (!outputTokenAddress || !isValid || isLoadingToken) return false;
+      // Output token: validated from graph (destination chain), not useERC20
+      if (!outputTokenAddress || !selectedOutputToken) return false;
       if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
         return false;
 
       try {
-        // decimal check for output amount
-        if (decimals !== undefined) {
+        // decimal check for output amount (use output token decimals from graph)
+        const outputDecimals = selectedOutputToken.decimals;
+        if (outputDecimals !== undefined) {
           const parts = outputAmount.split(".");
-          if (parts.length > 1 && parts[1].length > decimals) return false;
+          if (parts.length > 1 && parts[1].length > outputDecimals) return false;
         }
       } catch {
         return false;
@@ -148,12 +182,10 @@ export default function BalancePage() {
     outputAmount,
     tokenType,
     outputTokenAddress,
-    isValid,
-    isLoadingToken,
+    selectedOutputToken,
     depositTokenAddress,
     isValidDeposit,
     isLoadingDeposit,
-    decimals,
   ]);
 
   const onSubmit = async () => {
@@ -171,12 +203,12 @@ export default function BalancePage() {
           depositTokenAddress,
           tokenInAmount: parseUnits(
             inputAmount || "0",
-            decimals ?? 18,
+            depositDecimals ?? 18,
           ).toString(),
           outputTokenAddress,
           minTokenOut: parseUnits(
             outputAmount || "0",
-            decimals ?? 18,
+            selectedOutputToken?.decimals ?? 18,
           ).toString(),
           destinationChainId: destinationChainId,
           protocolHashIdentifier:
@@ -260,7 +292,7 @@ export default function BalancePage() {
   const mintTokens = async () => {
     if (!address || !faucetToken || !faucetAmount) return;
 
-    const selectedToken = FAUCET_TOKENS.find(t => t.address === faucetToken);
+    const selectedToken = graphTokens.find((t) => t.address === faucetToken);
     if (!selectedToken) return;
 
     setIsMinting(true);
@@ -278,7 +310,7 @@ export default function BalancePage() {
 
     try {
       const amount = parseUnits(faucetAmount, selectedToken.decimals);
-      
+
       const hash = await writeContractAsync({
         address: faucetToken as `0x${string}`,
         abi: ERC20_ABI,
@@ -325,7 +357,8 @@ export default function BalancePage() {
       showNotification({
         type: "error",
         title: "Mint Failed",
-        message: error instanceof Error ? error.message : "Failed to mint tokens",
+        message:
+          error instanceof Error ? error.message : "Failed to mint tokens",
         chainId,
       });
     } finally {
@@ -361,6 +394,9 @@ export default function BalancePage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* User Balances: wallet list + locked balances with initiate/withdraw */}
+          <UserBalancesList tokens={graphTokens} />
+
           {/* Top Row: Deposit Form and Your Compacts side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Deposit Form */}
@@ -418,7 +454,7 @@ export default function BalancePage() {
                     onChange={(e) => setOutputTokenAddress(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   >
-                    {FAUCET_TOKENS.map((token) => (
+                    {outputTokenOptions.map((token) => (
                       <option key={token.address} value={token.address}>
                         {token.symbol}
                       </option>
@@ -440,7 +476,7 @@ export default function BalancePage() {
                     onChange={(e) => setDepositTokenAddress(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   >
-                    {FAUCET_TOKENS.map((token) => (
+                    {graphTokens.map((token) => (
                       <option key={token.address} value={token.address}>
                         {token.symbol}
                       </option>
@@ -451,7 +487,11 @@ export default function BalancePage() {
                   </div>
                   {depositBalance && depositSymbol && (
                     <div className="mt-1 text-xs text-gray-400">
-                      Balance: {parseFloat(depositBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} {depositSymbol}
+                      Balance:{" "}
+                      {parseFloat(depositBalance).toLocaleString(undefined, {
+                        maximumFractionDigits: 6,
+                      })}{" "}
+                      {depositSymbol}
                     </div>
                   )}
                 </div>
@@ -466,10 +506,14 @@ export default function BalancePage() {
                   onChange={(e) => setDestinationChainId(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                 >
-                  <option value="84532">Base Sepolia (84532)</option>
-                  <option value="11155420">Optimism Sepolia (11155420)</option>
-                  <option value="11155111">Sepolia (11155111)</option>
-                  <option value="421614">Arbitrum Sepolia (421614)</option>
+                  {destinationChains.map((chain) => (
+                    <option
+                      key={chain.chainId}
+                      value={chain.chainId.toString()}
+                    >
+                      {chain.name} ({chain.chainId})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -517,7 +561,9 @@ export default function BalancePage() {
           {/* Token Faucet Section */}
           <div className="p-6 bg-[#0a0a0a] rounded-lg border border-gray-800 space-y-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-100">Token Faucet</h2>
+              <h2 className="text-xl font-semibold text-gray-100">
+                Token Faucet
+              </h2>
               <p className="text-sm text-gray-400 mt-1">
                 Mint test tokens to your connected wallet
               </p>
@@ -533,7 +579,7 @@ export default function BalancePage() {
                   onChange={(e) => setFaucetToken(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                 >
-                  {FAUCET_TOKENS.map((token) => (
+                  {graphTokens.map((token) => (
                     <option key={token.address} value={token.address}>
                       {token.symbol}
                     </option>
@@ -560,7 +606,12 @@ export default function BalancePage() {
 
             <button
               onClick={mintTokens}
-              disabled={isMinting || !address || !faucetAmount || isNaN(Number(faucetAmount))}
+              disabled={
+                isMinting ||
+                !address ||
+                !faucetAmount ||
+                isNaN(Number(faucetAmount))
+              }
               className="w-full py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isMinting ? "Minting..." : "Mint Tokens"}
@@ -610,7 +661,10 @@ export default function BalancePage() {
                     Transaction Status:
                   </div>
                   {intentStatus.map((tx, index) => {
-                    const explorerUrl = getBlockExplorerTxUrl(tx.chainId, tx.transactionHash);
+                    const explorerUrl = getBlockExplorerTxUrl(
+                      tx.chainId,
+                      tx.transactionHash,
+                    );
                     return (
                       <div
                         key={index}

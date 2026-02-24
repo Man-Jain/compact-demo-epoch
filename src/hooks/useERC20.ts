@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   useReadContract,
   useWriteContract,
   useAccount,
   useChainId,
   usePublicClient,
-} from 'wagmi';
-import { formatUnits, isAddress, type Hash } from 'viem';
-import { ERC20_ABI } from '../constants/contracts';
-import { useNotification } from './useNotification';
-import { COMPACT_ADDRESS } from '@epoch-protocol/epoch-commons-sdk';
+} from "wagmi";
+import { formatUnits, isAddress, type Hash } from "viem";
+import { ERC20_ABI } from "../constants/contracts";
+import { useNotification } from "./useNotification";
+import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
 
 // Max uint256 value for infinite approval
 const MAX_UINT256 =
-  '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
 export function useERC20(tokenAddress?: `0x${string}`) {
   const { address } = useAccount();
@@ -38,7 +38,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
   const { data: decimalsData, isLoading: isLoadingDecimals } = useReadContract({
     address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'decimals',
+    functionName: "decimals",
     query: {
       enabled: shouldLoad,
     },
@@ -47,7 +47,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
   const { data: symbolData, isLoading: isLoadingSymbol } = useReadContract({
     address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'symbol',
+    functionName: "symbol",
     query: {
       enabled: shouldLoad,
     },
@@ -56,7 +56,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
   const { data: nameData, isLoading: isLoadingName } = useReadContract({
     address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'name',
+    functionName: "name",
     query: {
       enabled: shouldLoad,
     },
@@ -65,7 +65,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
   const { data: balanceData, isLoading: isLoadingBalance } = useReadContract({
     address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'balanceOf',
+    functionName: "balanceOf",
     args: [address!],
     query: {
       enabled: shouldLoad && Boolean(address),
@@ -76,7 +76,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
     useReadContract({
       address: tokenAddress,
       abi: ERC20_ABI,
-      functionName: 'allowance',
+      functionName: "allowance",
       args: [address!, compactAddress],
       query: {
         enabled: shouldLoad && Boolean(address),
@@ -94,7 +94,7 @@ export function useERC20(tokenAddress?: `0x${string}`) {
         isLoadingSymbol ||
         isLoadingName ||
         isLoadingBalance ||
-        isLoadingAllowance
+        isLoadingAllowance,
     );
   }, [
     shouldLoad,
@@ -136,17 +136,17 @@ export function useERC20(tokenAddress?: `0x${string}`) {
   const { writeContractAsync } = useWriteContract();
 
   const approve = async (): Promise<Hash> => {
-    if (!tokenAddress || !address) throw new Error('Not ready');
-    if (!publicClient) throw new Error('Public client not available');
+    if (!tokenAddress || !address) throw new Error("Not ready");
+    if (!publicClient) throw new Error("Public client not available");
 
     // Generate a temporary transaction ID for linking notifications
     const tempTxId = `pending-${Date.now()}`;
 
     showNotification({
-      type: 'info',
-      title: 'Initiating Approval',
-      message: 'Please confirm the transaction in your wallet...',
-      stage: 'initiated',
+      type: "info",
+      title: "Initiating Approval",
+      message: "Please confirm the transaction in your wallet...",
+      stage: "initiated",
       txHash: tempTxId,
       chainId,
       autoHide: false,
@@ -156,15 +156,15 @@ export function useERC20(tokenAddress?: `0x${string}`) {
       const newHash = await writeContractAsync({
         address: tokenAddress,
         abi: ERC20_ABI,
-        functionName: 'approve',
+        functionName: "approve",
         args: [compactAddress, MAX_UINT256 as `0x${string}`],
       });
 
       showNotification({
-        type: 'success',
-        title: 'Approval Submitted',
-        message: 'Waiting for confirmation...',
-        stage: 'submitted',
+        type: "success",
+        title: "Approval Submitted",
+        message: "Waiting for confirmation...",
+        stage: "submitted",
         txHash: newHash,
         chainId,
         autoHide: true,
@@ -178,12 +178,12 @@ export function useERC20(tokenAddress?: `0x${string}`) {
           hash: newHash,
         })
         .then((receipt) => {
-          if (receipt.status === 'success') {
+          if (receipt.status === "success") {
             showNotification({
-              type: 'success',
-              title: 'Approval Confirmed',
-              message: `Successfully approved ${symbol || 'token'} for The Compact`,
-              stage: 'confirmed',
+              type: "success",
+              title: "Approval Confirmed",
+              message: `Successfully approved ${symbol || "token"} for The Compact`,
+              stage: "confirmed",
               txHash: newHash,
               chainId,
               autoHide: false,
@@ -195,12 +195,12 @@ export function useERC20(tokenAddress?: `0x${string}`) {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.toLowerCase().includes('user rejected')
+        error.message.toLowerCase().includes("user rejected")
       ) {
         showNotification({
-          type: 'error',
-          title: 'Transaction Rejected',
-          message: 'You rejected the transaction',
+          type: "error",
+          title: "Transaction Rejected",
+          message: "You rejected the transaction",
           txHash: tempTxId,
           chainId,
           autoHide: true,

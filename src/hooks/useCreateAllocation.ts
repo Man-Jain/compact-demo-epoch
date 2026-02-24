@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
-import { useBalances } from './useBalances';
-import { useNotification } from './useNotification';
-import { useAllocatorAPI } from './useAllocatorAPI';
-import { parseUnits } from 'viem';
+import { useState, useEffect, useCallback } from "react";
+import { useAccount, useWalletClient } from "wagmi";
+import { useBalances } from "./useBalances";
+import { useNotification } from "./useNotification";
+import { useAllocatorAPI } from "./useAllocatorAPI";
+import { parseUnits } from "viem";
 import {
   CompactData,
   createLockTag,
   getAllocatorId,
   getSignedCompact,
-} from '../utils/chains';
-import { COMPACT_ADDRESS } from '@epoch-protocol/epoch-commons-sdk';
+} from "../utils/chains";
+import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
 
 interface Token {
   tokenAddress: string;
@@ -42,10 +42,10 @@ interface Balance {
 }
 
 export const EXPIRY_OPTIONS = [
-  { label: '1 minute', value: '1min', seconds: 60 },
-  { label: '10 minutes', value: '10min', seconds: 600 },
-  { label: '1 hour', value: '1hour', seconds: 3600 },
-  { label: 'Custom', value: 'custom', seconds: 0 },
+  { label: "1 minute", value: "1min", seconds: 60 },
+  { label: "10 minutes", value: "10min", seconds: 600 },
+  { label: "1 hour", value: "1hour", seconds: 3600 },
+  { label: "Custom", value: "custom", seconds: 0 },
 ];
 
 export function useCreateAllocation(sessionToken: string) {
@@ -57,27 +57,27 @@ export function useCreateAllocation(sessionToken: string) {
   const { data: client } = useWalletClient();
 
   const [formData, setFormData] = useState({
-    lockId: '',
-    amount: '',
-    arbiterAddress: '',
-    nonce: '',
-    expiration: '',
-    witnessHash: '',
-    witnessTypestring: '',
+    lockId: "",
+    amount: "",
+    arbiterAddress: "",
+    nonce: "",
+    expiration: "",
+    witnessHash: "",
+    witnessTypestring: "",
   });
 
   const [errors, setErrors] = useState({
-    lockId: '',
-    amount: '',
-    arbiterAddress: '',
-    nonce: '',
-    expiration: '',
+    lockId: "",
+    amount: "",
+    arbiterAddress: "",
+    nonce: "",
+    expiration: "",
   });
 
   const [showWitnessFields, setShowWitnessFields] = useState(false);
   const [selectedLock, setSelectedLock] = useState<Balance | null>(null);
   const [lockDecimals, setLockDecimals] = useState<number>(18);
-  const [expiryOption, setExpiryOption] = useState('10min');
+  const [expiryOption, setExpiryOption] = useState("10min");
   const [customExpiry, setCustomExpiry] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,8 +85,8 @@ export function useCreateAllocation(sessionToken: string) {
     if (address) {
       const addressBytes = address.slice(2);
       const randomBytes = Array.from({ length: 24 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join('');
+        Math.floor(Math.random() * 16).toString(16),
+      ).join("");
       const nonce = `0x${addressBytes}${randomBytes}`;
       setFormData((prev) => ({ ...prev, nonce }));
     }
@@ -107,21 +107,21 @@ export function useCreateAllocation(sessionToken: string) {
   }, [selectedLock, getResourceLockDecimals]);
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: '' }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
 
-    if (name === 'lockId') {
+    if (name === "lockId") {
       const lock = balances.find((b) => b.lockId === value);
       if (lock) {
         setSelectedLock({
           ...lock,
           balance: lock.allocatableBalance,
-          tokenName: lock.token?.name || '',
+          tokenName: lock.token?.name || "",
           decimals: lock.token?.decimals || 18,
-          symbol: lock.token?.symbol || '',
+          symbol: lock.token?.symbol || "",
         });
       } else {
         setSelectedLock(null);
@@ -132,7 +132,7 @@ export function useCreateAllocation(sessionToken: string) {
   const handleExpiryChange = (value: string) => {
     setExpiryOption(value);
 
-    if (value === 'custom') {
+    if (value === "custom") {
       setCustomExpiry(true);
       return;
     }
@@ -141,9 +141,9 @@ export function useCreateAllocation(sessionToken: string) {
     // For non-custom options, we'll calculate the expiration at submission time
     setFormData((prev) => ({
       ...prev,
-      expiration: '', // Clear any custom expiration
+      expiration: "", // Clear any custom expiration
     }));
-    setErrors((prev) => ({ ...prev, expiration: '' }));
+    setErrors((prev) => ({ ...prev, expiration: "" }));
   };
 
   const getExpirationTime = () => {
@@ -153,56 +153,56 @@ export function useCreateAllocation(sessionToken: string) {
 
     const now = Math.floor(Date.now() / 1000);
     const option = EXPIRY_OPTIONS.find((opt) => opt.value === expiryOption);
-    return option ? (now + option.seconds).toString() : '';
+    return option ? (now + option.seconds).toString() : "";
   };
 
   const validateForm = () => {
     const newErrors = {
-      lockId: '',
-      amount: '',
-      arbiterAddress: '',
-      nonce: '',
-      expiration: '',
+      lockId: "",
+      amount: "",
+      arbiterAddress: "",
+      nonce: "",
+      expiration: "",
     };
 
     if (!formData.lockId) {
-      newErrors.lockId = 'Resource lock is required';
+      newErrors.lockId = "Resource lock is required";
     }
 
     if (!formData.amount) {
-      newErrors.amount = 'Amount is required';
+      newErrors.amount = "Amount is required";
     } else if (selectedLock) {
       try {
         const amountBigInt = parseUnits(formData.amount, lockDecimals);
         const availableBigInt = BigInt(selectedLock.balanceAvailableToAllocate);
         if (amountBigInt > availableBigInt) {
-          newErrors.amount = 'Amount exceeds available balance';
+          newErrors.amount = "Amount exceeds available balance";
         }
       } catch {
-        newErrors.amount = 'Invalid amount';
+        newErrors.amount = "Invalid amount";
       }
     }
 
     if (!formData.arbiterAddress) {
-      newErrors.arbiterAddress = 'Arbiter address is required';
+      newErrors.arbiterAddress = "Arbiter address is required";
     } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbiterAddress)) {
-      newErrors.arbiterAddress = 'Invalid address format';
+      newErrors.arbiterAddress = "Invalid address format";
     }
 
     if (!formData.nonce) {
-      newErrors.nonce = 'Nonce is required';
+      newErrors.nonce = "Nonce is required";
     }
 
     const expirationTime = customExpiry
       ? formData.expiration
       : getExpirationTime();
     if (!expirationTime) {
-      newErrors.expiration = 'Expiration is required';
+      newErrors.expiration = "Expiration is required";
     } else {
       const expTime = parseInt(expirationTime);
       const now = Math.floor(Date.now() / 1000);
       if (isNaN(expTime) || expTime <= now) {
-        newErrors.expiration = 'Expiration must be in the future';
+        newErrors.expiration = "Expiration must be in the future";
       }
     }
 
@@ -247,7 +247,7 @@ export function useCreateAllocation(sessionToken: string) {
         token: BigInt(selectedLock.token?.tokenAddress!),
         amount: parseUnits(formData.amount, lockDecimals),
         mandate: {
-          tokenOut: '0x7946dd86eE310D0aC16804A37787289Fa5b88A8A',
+          tokenOut: "0x7946dd86eE310D0aC16804A37787289Fa5b88A8A",
           minTokenOut: 1000000000n,
           chainId: parseInt(request.chainId),
         },
@@ -257,42 +257,42 @@ export function useCreateAllocation(sessionToken: string) {
         client,
         COMPACT_ADDRESS,
         compactData,
-        parseInt(request.chainId)
+        parseInt(request.chainId),
       );
 
-      console.log('signed: ', signed);
+      console.log("signed: ", signed);
 
       const result = await createAllocation(sessionToken, {
         ...request,
         sponsorSignature: signed,
       });
-      console.log('result: ', result.digest);
+      console.log("result: ", result.digest);
 
       showNotification({
-        type: 'success',
-        title: 'Allocation Created',
+        type: "success",
+        title: "Allocation Created",
         message: `Successfully created allocation with hash: ${result.hash}`,
       });
 
       setFormData({
-        lockId: '',
-        amount: '',
-        arbiterAddress: '',
-        nonce: '',
-        expiration: '',
-        witnessHash: '',
-        witnessTypestring: '',
+        lockId: "",
+        amount: "",
+        arbiterAddress: "",
+        nonce: "",
+        expiration: "",
+        witnessHash: "",
+        witnessTypestring: "",
       });
       setShowWitnessFields(false);
       generateNewNonce();
     } catch (error) {
       showNotification({
-        type: 'error',
-        title: 'Error',
+        type: "error",
+        title: "Error",
         message:
           error instanceof Error
             ? error.message
-            : 'Failed to create allocation',
+            : "Failed to create allocation",
       });
     } finally {
       setIsSubmitting(false);
