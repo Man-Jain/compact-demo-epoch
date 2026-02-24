@@ -1,16 +1,10 @@
-import { useMemo, useState } from "react";
-import { useAccount, useChainId, useReadContracts, useWalletClient } from "wagmi";
-import { formatUnits } from "viem";
+import { useCallback, useEffect, useState } from "react";
+import { useAccount, useChainId, useWalletClient } from "wagmi";
 import type { TokenInfo } from "../config/web3";
 import { WalletWithdrawDialog } from "./WalletWithdrawDialog";
 import { useNotification } from "../hooks/useNotification";
 import {
-  COMPACT_ADDRESS,
-  COMPACT_ABI,
   ALLOCATOR_ADDRESS,
-  createLockTag,
-  getTokenId,
-  getAllocatorId,
   EpochIntentSDK,
 } from "@epoch-protocol/epoch-intents-sdk";
 import type { ForcedWithdrawalStatus } from "./WalletWithdrawDialog";
@@ -39,84 +33,54 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
   const { data: walletClient } = useWalletClient();
   const { showNotification } = useNotification();
 
-  const { tokenIdsWithMeta } = useMemo(() => {
-    const allocatorId = getAllocatorId(ALLOCATOR_ADDRESS as `0x${string}`);
-    const lockTag = createLockTag(4n, 0n, allocatorId);
-    const list: Array<{ id: bigint; token: TokenInfo }> = [];
-    for (const token of tokens) {
-      const id = getTokenId(lockTag, BigInt(token.address as `0x${string}`));
-      list.push({ id, token });
+  const [balanceRows, setBalanceRows] = useState<CompactBalanceRow[]>([]);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+
+  const loadBalances = useCallback(async () => {
+    if (!isConnected || !address || !walletClient || tokens.length === 0) {
+      setBalanceRows([]);
+      return;
     }
-    return { tokenIdsWithMeta: list };
-  }, [tokens]);
 
-  const compactReadContracts = useMemo(() => {
-    if (!address || tokenIdsWithMeta.length === 0) return [];
-    return tokenIdsWithMeta.flatMap(({ id }) => [
-      {
-        address: COMPACT_ADDRESS as `0x${string}`,
-        abi: COMPACT_ABI,
-        functionName: "balanceOf" as const,
-        args: [address as `0x${string}`, id] as const,
-      },
-      {
-        address: COMPACT_ADDRESS as `0x${string}`,
-        abi: COMPACT_ABI,
-        functionName: "getForcedWithdrawalStatus" as const,
-        args: [address as `0x${string}`, id] as const,
-      },
-    ]);
-  }, [address, tokenIdsWithMeta]);
-
-  const { data: compactReadResults, refetch } = useReadContracts({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contracts: compactReadContracts as any,
-    query: {
-      enabled:
-        isConnected &&
-        !!address &&
-        tokenIdsWithMeta.length > 0 &&
-        compactReadContracts.length > 0,
-    },
-  });
-
-  const balanceRows = useMemo((): CompactBalanceRow[] => {
-    if (!compactReadResults || compactReadResults.length === 0) return [];
-    const rows: CompactBalanceRow[] = [];
-    for (let i = 0; i < tokenIdsWithMeta.length; i++) {
-      const { id, token } = tokenIdsWithMeta[i];
-      const balanceResult = compactReadResults[i * 2];
-      const statusResult = compactReadResults[i * 2 + 1];
-      const balanceRaw =
-        balanceResult?.status === "success" && balanceResult.result != null
-          ? BigInt(balanceResult.result as bigint)
-          : 0n;
-      let status: ForcedWithdrawalStatus = "Disabled";
-      if (
-        statusResult?.status === "success" &&
-        Array.isArray(statusResult.result)
-      ) {
-        const [statusEnum] = statusResult.result as [number, bigint];
-        status =
-          (["Disabled", "Pending", "Enabled"] as const)[statusEnum ?? 0] ??
-          "Disabled";
-      }
-      rows.push({
-        depositId: id.toString(),
-        symbol: token.symbol,
-        balance: formatUnits(balanceRaw, token.decimals),
-        decimals: token.decimals,
-        withdrawStatus: status,
+    try {
+      setIsLoadingBalances(true);
+      const sdk = new EpochIntentSDK({
+        apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
+        walletClient,
       });
+
+      const tokenInputs = tokens.map((token) => ({
+        address: token.address as `0x${string}`,
+        symbol: token.symbol,
+        decimals: token.decimals,
+      }));
+
+      const results = await sdk.getDepositedBalances(address, tokenInputs);
+      setBalanceRows(results);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load balances";
+      showNotification({
+        type: "error",
+        title: "Load balances failed",
+        message,
+        chainId,
+        autoHide: true,
+      });
+    } finally {
+      setIsLoadingBalances(false);
     }
-    return rows;
-  }, [tokenIdsWithMeta, compactReadResults]);
+  }, [address, chainId, isConnected, showNotification, tokens, walletClient]);
+
+  useEffect(() => {
+    void loadBalances();
+  }, [loadBalances]);
 
   const [withdrawRow, setWithdrawRow] = useState<CompactBalanceRow | null>(
-    null
+    null,
   );
   const [disablingDepositId, setDisablingDepositId] = useState<string | null>(
-    null
+    null,
   );
 
   const canDisable = (row: CompactBalanceRow) =>
@@ -149,10 +113,9 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
         chainId,
         autoHide: true,
       });
-      await refetch();
+      await loadBalances();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Disable failed";
+      const message = error instanceof Error ? error.message : "Disable failed";
       if (!message.toLowerCase().includes("user rejected")) {
         showNotification({
           type: "error",
@@ -194,7 +157,14 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
             </tr>
           </thead>
           <tbody>
-            {balanceRows.length === 0 && (
+            {isLoadingBalances && balanceRows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-4 text-gray-500">
+                  Loading Compact balances…
+                </td>
+              </tr>
+            )}
+            {!isLoadingBalances && balanceRows.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-4 text-gray-500">
                   No Compact balances for this allocator
