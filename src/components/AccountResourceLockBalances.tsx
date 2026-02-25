@@ -1,18 +1,21 @@
-import React, { useState, useMemo } from 'react';
-import { useCompacts, CompactRecord } from '../hooks/useCompacts';
-import { formatAddress, formatTimestamp } from '../utils/formatting';
-import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
-import { useIntentStatus } from '../hooks/useIntentStatus';
-import { getBlockExplorerTxUrl } from '../utils/chains';
+import React, { useState, useMemo } from "react";
+import { useCompacts, CompactRecord } from "../hooks/useCompacts";
+import { formatAddress, formatTimestamp } from "../utils/formatting";
+import { formatUnits } from "viem";
+import { useAccount } from "wagmi";
+import { useIntentStatus } from "../hooks/useIntentStatus";
+import { getBlockExplorerTxUrl } from "../utils/chains";
 
 const AccountResourceLockBalances: React.FC = () => {
   const { address } = useAccount();
-  const { compacts: databaseCompacts, isLoading: compactsLoading, refetch: refetchCompacts } =
-    useCompacts(address ?? '');
+  const {
+    compacts: databaseCompacts,
+    isLoading: compactsLoading,
+    refetch: refetchCompacts,
+  } = useCompacts(address ?? "");
 
   const [expandedCompacts, setExpandedCompacts] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Group registered compacts by chain
@@ -28,7 +31,7 @@ const AccountResourceLockBalances: React.FC = () => {
         acc[groupKey].push(compact);
         return acc;
       },
-      {} as Record<string, CompactRecord[]>
+      {} as Record<string, CompactRecord[]>,
     );
   }, [databaseCompacts]);
 
@@ -50,9 +53,7 @@ const AccountResourceLockBalances: React.FC = () => {
         </h2>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00ff00]"></div>
-          <span className="ml-3 text-gray-400">
-            Loading intents history...
-          </span>
+          <span className="ml-3 text-gray-400">Loading intents history...</span>
         </div>
       </div>
     );
@@ -68,9 +69,7 @@ const AccountResourceLockBalances: React.FC = () => {
           Your Intents History
         </h2>
         <div className="text-center py-12">
-          <div className="text-gray-400 mb-2 text-lg">
-            📄 No intents found
-          </div>
+          <div className="text-gray-400 mb-2 text-lg">📄 No intents found</div>
           <div className="text-gray-500 text-sm">
             Intents will appear here once they are created
           </div>
@@ -86,9 +85,7 @@ const AccountResourceLockBalances: React.FC = () => {
   return (
     <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">
-          Your Intents History
-        </h2>
+        <h2 className="text-xl font-bold text-white">Your Intents History</h2>
         <button
           onClick={handleRefresh}
           className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors font-medium"
@@ -99,31 +96,31 @@ const AccountResourceLockBalances: React.FC = () => {
 
       <div className="space-y-4">
         <div className="max-h-96 overflow-y-auto space-y-3">
-            {groupKeys.map(
-              (groupKey) =>
-                groupedRegisteredCompacts[groupKey] && (
-                  <div
-                    key={groupKey}
-                    className="bg-gray-900 rounded-lg border border-gray-700 p-4"
-                  >
-                    <h4 className="text-sm font-medium text-gray-300 mb-2">
-                      {groupKey.replace('chain-', 'Chain ')}
-                    </h4>
-                    <div className="space-y-2">
-                      {groupedRegisteredCompacts[groupKey].map((compact) => (
-                        <DatabaseCompactCard
-                          key={compact.hash}
-                          compact={compact}
-                          isExpanded={expandedCompacts.has(compact.hash)}
-                          onToggleExpanded={() =>
-                            toggleCompactExpanded(compact.hash)
-                          }
-                        />
-                      ))}
-                    </div>
+          {groupKeys.map(
+            (groupKey) =>
+              groupedRegisteredCompacts[groupKey] && (
+                <div
+                  key={groupKey}
+                  className="bg-gray-900 rounded-lg border border-gray-700 p-4"
+                >
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">
+                    {groupKey.replace("chain-", "Chain ")}
+                  </h4>
+                  <div className="space-y-2">
+                    {groupedRegisteredCompacts[groupKey].map((compact) => (
+                      <DatabaseCompactCard
+                        key={compact.hash}
+                        compact={compact}
+                        isExpanded={expandedCompacts.has(compact.hash)}
+                        onToggleExpanded={() =>
+                          toggleCompactExpanded(compact.hash)
+                        }
+                      />
+                    ))}
                   </div>
-                )
-            )}
+                </div>
+              ),
+          )}
         </div>
       </div>
     </div>
@@ -146,30 +143,40 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
     new Date(parseInt(compact.compact.expires) * 1000) < new Date();
 
   // Fetch intent status with auto-refresh every 5 seconds
-  const { statuses, isLoading: isStatusLoading, error: statusError } = useIntentStatus(
+  const {
+    statuses,
+    isLoading: isStatusLoading,
+    error: statusError,
+  } = useIntentStatus(
     address,
     compact.compact.nonce,
     true, // enabled
     true, // autoRefresh
-    5000  // 5 second refresh interval
+    5000, // 5 second refresh interval
   );
 
   // Determine overall status
   const getOverallStatus = () => {
-    if (isStatusLoading) return { label: 'Loading...', color: 'bg-blue-900 text-blue-300' };
-    if (statusError) return { label: 'Error', color: 'bg-red-900 text-red-300' };
-    if (!statuses || statuses.length === 0) return { label: 'Pending', color: 'bg-yellow-900 text-yellow-300' };
-    
+    if (isStatusLoading)
+      return { label: "Loading...", color: "bg-blue-900 text-blue-300" };
+    if (statusError)
+      return { label: "Error", color: "bg-red-900 text-red-300" };
+    if (!statuses || statuses.length === 0)
+      return { label: "Pending", color: "bg-yellow-900 text-yellow-300" };
+
     // Check if all transactions are successful
-    const allSuccess = statuses.every(s => s.status === 'success');
-    if (allSuccess) return { label: 'Completed', color: 'bg-green-900 text-green-300' };
-    
+    const allSuccess = statuses.every((s) => s.status === "success");
+    if (allSuccess)
+      return { label: "Completed", color: "bg-green-900 text-green-300" };
+
     // Check if any transaction failed
-    const anyFailed = statuses.some(s => s.status === 'failed' || s.status === 'reverted');
-    if (anyFailed) return { label: 'Failed', color: 'bg-red-900 text-red-300' };
-    
+    const anyFailed = statuses.some(
+      (s) => s.status === "failed" || s.status === "reverted",
+    );
+    if (anyFailed) return { label: "Failed", color: "bg-red-900 text-red-300" };
+
     // Otherwise, in progress
-    return { label: 'In Progress', color: 'bg-blue-900 text-blue-300' };
+    return { label: "In Progress", color: "bg-blue-900 text-blue-300" };
   };
 
   const overallStatus = getOverallStatus();
@@ -179,17 +186,17 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-white">
-              Intent
-            </span>
+            <span className="text-sm font-medium text-white">Intent</span>
             {/* Intent Status Badge */}
-            <span className={`px-2 py-1 rounded text-xs font-medium ${overallStatus.color}`}>
+            <span
+              className={`px-2 py-1 rounded text-xs font-medium ${overallStatus.color}`}
+            >
               {overallStatus.label}
             </span>
           </div>
 
           <div className="text-xs text-gray-400">
-            Amount: {formatUnits(BigInt(compact.compact.amount), 18)} USDT
+            Amount: compact.compact.amount
           </div>
 
           <div className="text-xs text-gray-400">
@@ -212,7 +219,7 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
           onClick={onToggleExpanded}
           className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
         >
-          {isExpanded ? 'Hide' : 'Details'}
+          {isExpanded ? "Hide" : "Details"}
         </button>
       </div>
 
@@ -226,7 +233,10 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
               </div>
               <div className="space-y-2">
                 {statuses.map((tx, index) => {
-                  const explorerUrl = getBlockExplorerTxUrl(tx.chainId, tx.transactionHash);
+                  const explorerUrl = getBlockExplorerTxUrl(
+                    tx.chainId,
+                    tx.transactionHash,
+                  );
                   return (
                     <div
                       key={index}
@@ -238,22 +248,23 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            tx.status === 'success'
-                              ? 'bg-green-500/20 text-green-400'
-                              : tx.status === 'failed' || tx.status === 'reverted'
-                              ? 'bg-red-500/20 text-red-400'
-                              : 'bg-yellow-500/20 text-yellow-400'
+                            tx.status === "success"
+                              ? "bg-green-500/20 text-green-400"
+                              : tx.status === "failed" ||
+                                  tx.status === "reverted"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-yellow-500/20 text-yellow-400"
                           }`}
                         >
                           {tx.status}
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
-                        <span className="text-gray-500">Chain:</span>{' '}
+                        <span className="text-gray-500">Chain:</span>{" "}
                         {tx.chainId}
                       </div>
                       <div className="text-xs text-gray-400 font-mono break-all">
-                        <span className="text-gray-500">Hash:</span>{' '}
+                        <span className="text-gray-500">Hash:</span>{" "}
                         {explorerUrl ? (
                           <a
                             href={explorerUrl}
@@ -282,11 +293,11 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
                 <span
                   className={`px-2 py-1 rounded text-xs font-medium ${
                     isExpired
-                      ? 'bg-red-900 text-red-300'
-                      : 'bg-green-900 text-green-300'
+                      ? "bg-red-900 text-red-300"
+                      : "bg-green-900 text-green-300"
                   }`}
                 >
-                  {isExpired ? 'Expired' : 'Active'}
+                  {isExpired ? "Expired" : "Active"}
                 </span>
               </div>
             </div>
@@ -337,7 +348,7 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
                     <div className="font-mono text-gray-300">
                       {formatUnits(
                         BigInt(compact.witnessData.tokenInAmount),
-                        18
+                        18,
                       )}
                     </div>
                   </div>
