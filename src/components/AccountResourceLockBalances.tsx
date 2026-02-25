@@ -196,7 +196,7 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
           </div>
 
           <div className="text-xs text-gray-400">
-            Amount: compact.compact.amount Wei
+            Amount: {compact.compact.amount} Wei
           </div>
 
           <div className="text-xs text-gray-400">
