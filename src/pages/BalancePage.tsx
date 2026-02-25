@@ -54,10 +54,7 @@ export default function BalancePage() {
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
   // Tokens for current (source) chain; deposit and faucet use this
-  const graphTokens = useMemo(
-    () => getTokensForChain(chainId),
-    [chainId],
-  );
+  const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
   const destinationChains = useMemo(
     () => getChainsFromGraph(chainId, { excludeCurrentChain: true }),
     [chainId],
@@ -74,16 +71,21 @@ export default function BalancePage() {
   useEffect(() => {
     if (graphTokens.length === 0) return;
     const first = graphTokens[0];
-    const hasDeposit = graphTokens.some((t) => t.address === depositTokenAddress);
+    const hasDeposit = graphTokens.some(
+      (t) => t.address === depositTokenAddress,
+    );
     const hasFaucet = graphTokens.some((t) => t.address === faucetToken);
-    if (!depositTokenAddress || !hasDeposit) setDepositTokenAddress(first.address);
+    if (!depositTokenAddress || !hasDeposit)
+      setDepositTokenAddress(first.address);
     if (!faucetToken || !hasFaucet) setFaucetToken(first.address);
   }, [chainId, graphTokens]);
 
   // Sync output token when destination chain (and thus outputTokenOptions) changes
   useEffect(() => {
     if (outputTokenOptions.length === 0) return;
-    const hasOutput = outputTokenOptions.some((t) => t.address === outputTokenAddress);
+    const hasOutput = outputTokenOptions.some(
+      (t) => t.address === outputTokenAddress,
+    );
     if (!outputTokenAddress || !hasOutput) {
       setOutputTokenAddress(outputTokenOptions[0].address);
     }
@@ -92,7 +94,7 @@ export default function BalancePage() {
   useEffect(() => {
     if (destinationChains.length === 0) return;
     const currentInList = destinationChains.some(
-      (c) => c.chainId.toString() === destinationChainId
+      (c) => c.chainId.toString() === destinationChainId,
     );
     if (!destinationChainId || !currentInList) {
       setDestinationChainId(destinationChains[0].chainId.toString());
@@ -106,7 +108,7 @@ export default function BalancePage() {
 
   // Output token lives on destination chain; use graph data, not useERC20 (which reads current chain)
   const selectedOutputToken = outputTokenOptions.find(
-    (t) => t.address === outputTokenAddress
+    (t) => t.address === outputTokenAddress,
   );
 
   const {
@@ -167,7 +169,8 @@ export default function BalancePage() {
         const outputDecimals = selectedOutputToken.decimals;
         if (outputDecimals !== undefined) {
           const parts = outputAmount.split(".");
-          if (parts.length > 1 && parts[1].length > outputDecimals) return false;
+          if (parts.length > 1 && parts[1].length > outputDecimals)
+            return false;
         }
       } catch {
         return false;
@@ -234,7 +237,7 @@ export default function BalancePage() {
       console.log("data: ", data);
 
       // Store the nonce from the allocationResponse
-      if (data.allocationResponse?.nonce) {
+      if (data?.allocationResponse?.nonce) {
         setNonce(data.allocationResponse.nonce);
       }
 
