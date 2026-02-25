@@ -134,7 +134,7 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
 
   return (
     <div className="p-6 bg-[#0a0a0a] rounded-lg border border-gray-800 space-y-6">
-      <h2 className="text-xl font-bold text-white">User Balances</h2>
+      <h2 className="text-xl font-bold text-white">User Deposited Balances</h2>
       <p className="text-sm text-gray-400">
         Balances from The Compact (balanceOf). Token IDs from allocator{" "}
         <code className="text-gray-500">{ALLOCATOR_ADDRESS.slice(0, 10)}…</code>{" "}
