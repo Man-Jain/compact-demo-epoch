@@ -46,7 +46,7 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
       setIsLoadingBalances(true);
       const sdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
-        walletClient,
+        walletClient: walletClient as any,
       });
 
       const tokenInputs = tokens.map((token) => ({
@@ -102,7 +102,7 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
     try {
       const sdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
-        walletClient,
+        walletClient: walletClient as any,
       });
       const result = await sdk.disableForcedWithdrawal(row.depositId);
       showNotification({

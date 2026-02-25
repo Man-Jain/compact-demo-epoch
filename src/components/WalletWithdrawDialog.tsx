@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { parseUnits, isAddress } from "viem";
 import { useAccount, useChainId, useWalletClient } from "wagmi";
 import { useNotification } from "../hooks/useNotification";
@@ -57,7 +57,7 @@ export function WalletWithdrawDialog({
     if (!walletClient) return null;
     return new EpochIntentSDK({
       apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
-      walletClient,
+      walletClient: walletClient as any,
     });
   };
 
