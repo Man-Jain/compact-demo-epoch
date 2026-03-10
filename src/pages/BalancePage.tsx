@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccount,
   useChainId,
@@ -18,7 +18,12 @@ import CompactsList from "../components/CompactsList";
 import AccountResourceLockBalances from "../components/AccountResourceLockBalances";
 import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
-import { EpochIntentSDK, TaskType } from "@epoch-protocol/epoch-intents-sdk";
+import {
+  EpochIntentSDK,
+  TaskType,
+  type IntentQuoteResult,
+  type SolveIntentParams,
+} from "@epoch-protocol/epoch-intents-sdk";
 import { ERC20_ABI } from "../constants/contracts";
 import { getTokensForChain, getChainsFromGraph } from "../config/web3";
 
@@ -46,12 +51,24 @@ export default function BalancePage() {
   const [depositTokenAddress, setDepositTokenAddress] = useState("");
   const [outputAmount, setOutputAmount] = useState("0");
   const [inputAmount, setInputAmount] = useState("100");
+  const [inputAmountDisplay, setInputAmountDisplay] = useState("100");
+
+  // Debounce: display updates immediately, inputAmount syncs after 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setInputAmount(inputAmountDisplay), 300);
+    return () => clearTimeout(t);
+  }, [inputAmountDisplay]);
+
   const [destinationChainId, setDestinationChainId] = useState("");
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
   >(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+  const [quoteResult, setQuoteResult] = useState<IntentQuoteResult | null>(
+    null,
+  );
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
@@ -156,7 +173,7 @@ export default function BalancePage() {
 
   const isFormValid = useMemo(() => {
     if (!isConnected || !address || !allocatorAddress) return false;
-    if (!inputAmount || isNaN(Number(inputAmount))) return false;
+    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
     if (tokenType === "erc20") {
       // Output token: validated from graph (destination chain), not useERC20
@@ -181,7 +198,7 @@ export default function BalancePage() {
     isConnected,
     address,
     allocatorAddress,
-    inputAmount,
+    inputAmountDisplay,
     outputAmount,
     tokenType,
     outputTokenAddress,
@@ -190,6 +207,105 @@ export default function BalancePage() {
     isValidDeposit,
     isLoadingDeposit,
   ]);
+
+  const canFetchQuote = useMemo(() => {
+    if (!walletClient || !address || !allocatorAddress) return false;
+    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
+    if (!outputAmount || isNaN(Number(outputAmount))) return false;
+    if (tokenType === "erc20") {
+      if (!outputTokenAddress || !selectedOutputToken) return false;
+      if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
+        return false;
+    }
+    return true;
+  }, [
+    walletClient,
+    address,
+    allocatorAddress,
+    inputAmountDisplay,
+    outputAmount,
+    tokenType,
+    outputTokenAddress,
+    selectedOutputToken,
+    depositTokenAddress,
+    isValidDeposit,
+    isLoadingDeposit,
+  ]);
+
+  const fetchIntentQuote = async () => {
+    if (!canFetchQuote) return;
+    setIsLoadingQuote(true);
+    setQuoteResult(null);
+    try {
+      const epochSdk = new EpochIntentSDK({
+        apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+        walletClient: walletClient as any,
+      });
+
+      const { taskTypeString, intentData } = await epochSdk.getTaskData({
+        taskType: TaskType.GetTokenOut,
+        intentData: {
+          isNative: tokenType === "native",
+          depositTokenAddress,
+          tokenInAmount: parseUnits(
+            inputAmountDisplay || "0",
+            depositDecimals ?? 18,
+          ).toString(),
+          outputTokenAddress,
+          minTokenOut: parseUnits(
+            outputAmount || "0",
+            selectedOutputToken?.decimals ?? 18,
+          ).toString(),
+          destinationChainId: destinationChainId,
+          protocolHashIdentifier:
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+          recipient: address as `0x${string}`,
+        },
+        extraDataTypestring: "uint256 somethingKey",
+        extraData: {
+          somethingKey: "123",
+        },
+      });
+
+      const result = await epochSdk.getIntentQuote({
+        sponsorAddress: address as `0x${string}`,
+        taskTypeString,
+        intentData,
+        isNative: tokenType === "native",
+      });
+
+      setQuoteResult(result);
+
+      showNotification({
+        type: "success",
+        title: "Quote Retrieved",
+        message: `Expected output: ${result.tokenOut ?? "—"} (raw)`,
+        chainId,
+        autoHide: true,
+      });
+    } catch (error) {
+      showNotification({
+        type: "error",
+        title: "Quote Failed",
+        message: error instanceof Error ? error.message : "Failed to get quote",
+        chainId,
+      });
+    } finally {
+      setIsLoadingQuote(false);
+    }
+  };
+
+  // Auto-fetch quote when debounced input amount changes (skip initial mount)
+  const isFirstInputAmountChange = useRef(true);
+  useEffect(() => {
+    if (isFirstInputAmountChange.current) {
+      isFirstInputAmountChange.current = false;
+      return;
+    }
+    if (!canFetchQuote || isLoadingQuote || isConfirming) return;
+    void fetchIntentQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on inputAmount change
+  }, [inputAmount]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
@@ -205,7 +321,7 @@ export default function BalancePage() {
           isNative: tokenType === "native",
           depositTokenAddress,
           tokenInAmount: parseUnits(
-            inputAmount || "0",
+            inputAmountDisplay || "0",
             depositDecimals ?? 18,
           ).toString(),
           outputTokenAddress,
@@ -227,13 +343,24 @@ export default function BalancePage() {
       console.log("taskTypeString: ", taskTypeString);
       console.log("intentData: ", intentData);
 
-      const data = await epochSdk.solveIntent({
+      if (!quoteResult) {
+        showNotification({
+          type: "error",
+          title: "Quote Required",
+          message: "Please click Get Quote first before submitting",
+          chainId,
+        });
+        return;
+      }
+
+      const params: SolveIntentParams = {
         isNative: false,
         sponsorAddress: address as `0x${string}`,
         taskTypeString,
         intentData,
-        // sessionToken: sessionToken ?? '',
-      });
+        quoteResult,
+      };
+      const data = await epochSdk.solveIntent(params);
       console.log("data: ", data);
 
       // Store the nonce from the allocationResponse
@@ -386,7 +513,7 @@ export default function BalancePage() {
 
       {!isConnected || !address ? (
         <div className="p-12 bg-[#0a0a0a] rounded-lg border border-gray-800 text-center">
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md mx-auto grid">
             <p className="text-gray-300 text-lg mb-2">
               Please connect your wallet to continue
             </p>
@@ -539,21 +666,64 @@ export default function BalancePage() {
                   </label>
                   <input
                     type="text"
-                    value={inputAmount}
-                    onChange={(e) => setInputAmount(e.target.value)}
+                    value={inputAmountDisplay}
+                    onChange={(e) => setInputAmountDisplay(e.target.value)}
                     placeholder="0.0"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
                 </div>
               </div>
 
-              <button
-                onClick={onSubmit}
-                disabled={!isFormValid || isConfirming}
-                className="w-full py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
-              </button>
+              {quoteResult && (
+                <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2">
+                  <div className="text-sm font-medium text-gray-300">
+                    Quote Result
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">tokenIn:</span>{" "}
+                      <span className="text-gray-200 font-mono">
+                        {quoteResult.tokenIn ?? "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">tokenOut:</span>{" "}
+                      <span className="text-gray-200 font-mono">
+                        {quoteResult.tokenOut ?? "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">
+                        resourceLockRequired:
+                      </span>{" "}
+                      <span className="text-gray-200">
+                        {String(quoteResult.resourceLockRequired ?? false)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use tokenOut to tweak Input Amount for expected output.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={fetchIntentQuote}
+                  disabled={!canFetchQuote || isLoadingQuote || isConfirming}
+                  className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoadingQuote ? "Loading Quote..." : "Get Quote"}
+                </button>
+                <button
+                  onClick={onSubmit}
+                  disabled={!isFormValid || !quoteResult || isConfirming}
+                  className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
+                </button>
+              </div>
             </div>
             <div>
               <AccountResourceLockBalances />
