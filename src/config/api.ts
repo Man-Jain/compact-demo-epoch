@@ -1,12 +1,10 @@
 // API configuration for backend endpoints
 interface Config {
   apiBaseUrl: string;
-  sioUrl: string;
 }
 
 export const config: Config = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
-  sioUrl: import.meta.env.VITE_SIO_URL || 'http://localhost:8080',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || "",
 };
 
 /**
@@ -17,11 +15,13 @@ export const config: Config = {
 export function getApiUrl(path: string): string {
   const baseUrl = config.apiBaseUrl;
   if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL environment variable is not set');
+    throw new Error("VITE_API_BASE_URL environment variable is not set");
   }
   // Ensure path starts with /
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   // Remove trailing slash from baseUrl if present
-  const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const normalizedBaseUrl = baseUrl.endsWith("/")
+    ? baseUrl.slice(0, -1)
+    : baseUrl;
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
