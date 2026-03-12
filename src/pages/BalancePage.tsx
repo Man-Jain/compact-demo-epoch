@@ -6,7 +6,7 @@ import {
   useWriteContract,
   usePublicClient,
 } from "wagmi";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
 import { useNotification } from "../hooks/useNotification";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
 import { useERC20 } from "../hooks/useERC20";
@@ -171,18 +171,31 @@ export default function BalancePage() {
     };
   }, [supportedChains, chainId, allocatorAddress]);
 
+  const isReverseQuoteMode = useMemo(
+    () =>
+      (!inputAmountDisplay ||
+        inputAmountDisplay === "0" ||
+        isNaN(Number(inputAmountDisplay))) &&
+      outputAmount &&
+      !isNaN(Number(outputAmount)) &&
+      Number(outputAmount) > 0,
+    [inputAmountDisplay, outputAmount],
+  );
+
   const isFormValid = useMemo(() => {
     if (!isConnected || !address || !allocatorAddress) return false;
-    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
+    if (isReverseQuoteMode) {
+      if (!quoteResult?.tokenIn) return false;
+    } else {
+      if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay)))
+        return false;
+    }
     if (tokenType === "erc20") {
-      // Output token: validated from graph (destination chain), not useERC20
       if (!outputTokenAddress || !selectedOutputToken) return false;
       if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
         return false;
-
       try {
-        // decimal check for output amount (use output token decimals from graph)
         const outputDecimals = selectedOutputToken.decimals;
         if (outputDecimals !== undefined) {
           const parts = outputAmount.split(".");
@@ -200,6 +213,8 @@ export default function BalancePage() {
     allocatorAddress,
     inputAmountDisplay,
     outputAmount,
+    isReverseQuoteMode,
+    quoteResult?.tokenIn,
     tokenType,
     outputTokenAddress,
     selectedOutputToken,
@@ -210,8 +225,12 @@ export default function BalancePage() {
 
   const canFetchQuote = useMemo(() => {
     if (!walletClient || !address || !allocatorAddress) return false;
-    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
+    if (Number(outputAmount) <= 0) return false;
+    if (!isReverseQuoteMode) {
+      if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay)))
+        return false;
+    }
     if (tokenType === "erc20") {
       if (!outputTokenAddress || !selectedOutputToken) return false;
       if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
@@ -224,6 +243,7 @@ export default function BalancePage() {
     allocatorAddress,
     inputAmountDisplay,
     outputAmount,
+    isReverseQuoteMode,
     tokenType,
     outputTokenAddress,
     selectedOutputToken,
@@ -247,10 +267,12 @@ export default function BalancePage() {
         intentData: {
           isNative: tokenType === "native",
           depositTokenAddress,
-          tokenInAmount: parseUnits(
-            inputAmountDisplay || "0",
-            depositDecimals ?? 18,
-          ).toString(),
+          tokenInAmount: isReverseQuoteMode
+            ? "0"
+            : parseUnits(
+                inputAmountDisplay || "0",
+                depositDecimals ?? 18,
+              ).toString(),
           outputTokenAddress,
           minTokenOut: parseUnits(
             outputAmount || "0",
@@ -279,7 +301,9 @@ export default function BalancePage() {
       showNotification({
         type: "success",
         title: "Quote Retrieved",
-        message: `Expected output: ${result.tokenOut ?? "—"} (raw)`,
+        message: isReverseQuoteMode
+          ? `Required input: ${result.tokenIn ?? "—"} (raw)`
+          : `Expected output: ${result.tokenOut ?? "—"} (raw)`,
         chainId,
         autoHide: true,
       });
@@ -295,17 +319,17 @@ export default function BalancePage() {
     }
   };
 
-  // Auto-fetch quote when debounced input amount changes (skip initial mount)
-  const isFirstInputAmountChange = useRef(true);
+  // Auto-fetch quote when debounced input or output amount changes (skip initial mount)
+  const isFirstQuoteTrigger = useRef(true);
   useEffect(() => {
-    if (isFirstInputAmountChange.current) {
-      isFirstInputAmountChange.current = false;
+    if (isFirstQuoteTrigger.current) {
+      isFirstQuoteTrigger.current = false;
       return;
     }
     if (!canFetchQuote || isLoadingQuote || isConfirming) return;
     void fetchIntentQuote();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on inputAmount change
-  }, [inputAmount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run on inputAmount or outputAmount
+  }, [inputAmount, outputAmount]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
@@ -315,15 +339,16 @@ export default function BalancePage() {
         walletClient: walletClient as any,
       });
 
+      const effectiveTokenInAmount = isReverseQuoteMode
+        ? (quoteResult!.tokenIn ?? "0")
+        : parseUnits(inputAmountDisplay || "0", depositDecimals ?? 18).toString();
+
       const { taskTypeString, intentData } = await epochSdk.getTaskData({
         taskType: TaskType.GetTokenOut,
         intentData: {
           isNative: tokenType === "native",
           depositTokenAddress,
-          tokenInAmount: parseUnits(
-            inputAmountDisplay || "0",
-            depositDecimals ?? 18,
-          ).toString(),
+          tokenInAmount: effectiveTokenInAmount,
           outputTokenAddress,
           minTokenOut: parseUnits(
             outputAmount || "0",
@@ -662,13 +687,18 @@ export default function BalancePage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Input Amount
+                    Input Amount{" "}
+                    {isReverseQuoteMode && (
+                      <span className="text-gray-500 font-normal">
+                        (0 = reverse quote)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="text"
                     value={inputAmountDisplay}
                     onChange={(e) => setInputAmountDisplay(e.target.value)}
-                    placeholder="0.0"
+                    placeholder={isReverseQuoteMode ? "0 for reverse quote" : "0.0"}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
                 </div>
@@ -681,10 +711,22 @@ export default function BalancePage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-gray-500">tokenIn:</span>{" "}
+                      <span className="text-gray-500">
+                        {isReverseQuoteMode ? "Required Input (tokenIn):" : "tokenIn:"}
+                      </span>{" "}
                       <span className="text-gray-200 font-mono">
-                        {quoteResult.tokenIn ?? "—"}
+                        {quoteResult.tokenIn
+                          ? formatUnits(
+                              BigInt(quoteResult.tokenIn),
+                              depositDecimals ?? 18,
+                            )
+                          : "—"}
                       </span>
+                      {quoteResult.tokenIn && depositSymbol && (
+                        <span className="text-gray-500 ml-1">
+                          {depositSymbol}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="text-gray-500">tokenOut:</span>{" "}
@@ -702,7 +744,9 @@ export default function BalancePage() {
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Use tokenOut to tweak Input Amount for expected output.
+                    {isReverseQuoteMode
+                      ? "tokenIn is the required input for your desired output. Submit to deposit this amount."
+                      : "Use tokenOut to tweak Input Amount for expected output."}
                   </p>
                 </div>
               )}
