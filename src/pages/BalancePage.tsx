@@ -341,7 +341,10 @@ export default function BalancePage() {
 
       const effectiveTokenInAmount = isReverseQuoteMode
         ? (quoteResult!.tokenIn ?? "0")
-        : parseUnits(inputAmountDisplay || "0", depositDecimals ?? 18).toString();
+        : parseUnits(
+            inputAmountDisplay || "0",
+            depositDecimals ?? 18,
+          ).toString();
 
       const { taskTypeString, intentData } = await epochSdk.getTaskData({
         taskType: TaskType.GetTokenOut,
@@ -368,22 +371,12 @@ export default function BalancePage() {
       console.log("taskTypeString: ", taskTypeString);
       console.log("intentData: ", intentData);
 
-      if (!quoteResult) {
-        showNotification({
-          type: "error",
-          title: "Quote Required",
-          message: "Please click Get Quote first before submitting",
-          chainId,
-        });
-        return;
-      }
-
       const params: SolveIntentParams = {
         isNative: false,
         sponsorAddress: address as `0x${string}`,
         taskTypeString,
         intentData,
-        quoteResult,
+        ...(quoteResult ? { quoteResult } : {}),
       };
       const data = await epochSdk.solveIntent(params);
       console.log("data: ", data);
@@ -698,7 +691,9 @@ export default function BalancePage() {
                     type="text"
                     value={inputAmountDisplay}
                     onChange={(e) => setInputAmountDisplay(e.target.value)}
-                    placeholder={isReverseQuoteMode ? "0 for reverse quote" : "0.0"}
+                    placeholder={
+                      isReverseQuoteMode ? "0 for reverse quote" : "0.0"
+                    }
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
                 </div>
@@ -712,7 +707,9 @@ export default function BalancePage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-gray-500">
-                        {isReverseQuoteMode ? "Required Input (tokenIn):" : "tokenIn:"}
+                        {isReverseQuoteMode
+                          ? "Required Input (tokenIn):"
+                          : "tokenIn:"}
                       </span>{" "}
                       <span className="text-gray-200 font-mono">
                         {quoteResult.tokenIn
@@ -762,7 +759,7 @@ export default function BalancePage() {
                 </button>
                 <button
                   onClick={onSubmit}
-                  disabled={!isFormValid || !quoteResult || isConfirming}
+                  disabled={!isFormValid || isConfirming}
                   className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
