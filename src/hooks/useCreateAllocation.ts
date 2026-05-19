@@ -255,7 +255,7 @@ export function useCreateAllocation(sessionToken: string) {
 
       const signed = await getSignedCompact(
         client,
-        COMPACT_ADDRESS,
+        COMPACT_ADDRESS[parseInt(request.chainId)] as `0x${string}`,
         compactData,
         parseInt(request.chainId),
       );
