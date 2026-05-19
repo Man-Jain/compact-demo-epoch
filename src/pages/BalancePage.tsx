@@ -25,7 +25,7 @@ import {
   type SolveIntentParams,
 } from "@epoch-protocol/epoch-intents-sdk";
 import { ERC20_ABI } from "../constants/contracts";
-import { getTokensForChain, getChainsFromGraph } from "../config/web3";
+import { getTokensForChain, getChainsFromGraph, isTestnetChain } from "../config/web3";
 
 interface IntentTransactionStatus {
   status: string;
@@ -69,6 +69,7 @@ export default function BalancePage() {
     null,
   );
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
@@ -524,9 +525,6 @@ export default function BalancePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* User Balances: wallet list + locked balances with initiate/withdraw */}
-          <UserBalancesList tokens={graphTokens} />
-
           {/* Top Row: Deposit Form and Your Compacts side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Deposit Form */}
@@ -731,72 +729,100 @@ export default function BalancePage() {
             {/* Your Compacts */}
           </div>
 
-          {/* Token Faucet Section */}
-          <div className="p-6 bg-[#0a0a0a] rounded-lg border border-gray-800 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-100">
-                Token Faucet
-              </h2>
-              <p className="text-sm text-gray-400 mt-1">
-                Mint test tokens to your connected wallet
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Token Faucet Section - only shown for testnets */}
+          {isTestnetChain(chainId) && (
+            <div className="p-6 bg-[#0a0a0a] rounded-lg border border-gray-800 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Select Token
-                </label>
-                <select
-                  value={faucetToken}
-                  onChange={(e) => setFaucetToken(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                >
-                  {graphTokens.map((token) => (
-                    <option key={token.address} value={token.address}>
-                      {token.symbol}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-1 text-xs text-gray-400 font-mono">
-                  {faucetToken}
+                <h2 className="text-xl font-semibold text-gray-100">
+                  Token Faucet
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Mint test tokens to your connected wallet
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Select Token
+                  </label>
+                  <select
+                    value={faucetToken}
+                    onChange={(e) => setFaucetToken(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                  >
+                    {graphTokens.map((token) => (
+                      <option key={token.address} value={token.address}>
+                        {token.symbol}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-1 text-xs text-gray-400 font-mono">
+                    {faucetToken}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Amount
+                  </label>
+                  <input
+                    type="text"
+                    value={faucetAmount}
+                    onChange={(e) => setFaucetAmount(e.target.value)}
+                    placeholder="0.0"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Amount
-                </label>
-                <input
-                  type="text"
-                  value={faucetAmount}
-                  onChange={(e) => setFaucetAmount(e.target.value)}
-                  placeholder="0.0"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                />
-              </div>
+              <button
+                onClick={mintTokens}
+                disabled={
+                  isMinting ||
+                  !address ||
+                  !faucetAmount ||
+                  isNaN(Number(faucetAmount))
+                }
+                className="w-full py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isMinting ? "Minting..." : "Mint Tokens"}
+              </button>
             </div>
+          )}
 
-            <button
-              onClick={mintTokens}
-              disabled={
-                isMinting ||
-                !address ||
-                !faucetAmount ||
-                isNaN(Number(faucetAmount))
-              }
-              className="w-full py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isMinting ? "Minting..." : "Mint Tokens"}
-            </button>
-          </div>
+          {/* User Balances: wallet list + locked balances with initiate/withdraw */}
+          <UserBalancesList tokens={graphTokens} />
 
           {/* Admin Section */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-white">Admin Section</h2>
-            <div>
-              <CompactsList />
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsAdminOpen((v) => !v)}
+              className="w-full flex items-center justify-between p-4 bg-[#0a0a0a] rounded-lg border border-gray-800 hover:border-gray-700 transition-colors"
+            >
+              <h2 className="text-2xl font-bold text-white">Admin Section</h2>
+              <svg
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                  isAdminOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            {isAdminOpen && (
+              <div className="p-4 bg-[#0a0a0a] rounded-lg border border-gray-800">
+                <CompactsList />
+              </div>
+            )}
           </div>
 
           {/* Intent Status Section */}

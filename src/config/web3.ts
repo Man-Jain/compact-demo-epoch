@@ -92,3 +92,10 @@ export function getChainsFromGraph(
 }
 
 export { mainnetGraph, testnetGraph };
+
+/**
+ * Check if a chain is a testnet (not in the mainnet chain IDs list).
+ */
+export function isTestnetChain(chainId: number): boolean {
+  return !MAINNET_CHAIN_IDS.has(chainId);
+}
