@@ -1,5 +1,5 @@
-import { useState, useEffect, memo } from 'react';
-import { formatTimeRemaining } from '../utils/formatting';
+import { useState, useEffect, memo } from "react";
+import { formatTimeRemaining } from "../utils/formatting";
 
 interface WithdrawalCountdownProps {
   withdrawableAt: string;
@@ -12,7 +12,7 @@ export const WithdrawalCountdown = memo(
     canExecute,
   }: WithdrawalCountdownProps) {
     const [currentTime, setCurrentTime] = useState(() =>
-      Math.floor(Date.now() / 1000)
+      Math.floor(Date.now() / 1000),
     );
 
     useEffect(() => {
@@ -24,23 +24,23 @@ export const WithdrawalCountdown = memo(
 
     const timeRemaining = withdrawableAt
       ? formatTimeRemaining(parseInt(withdrawableAt), currentTime)
-      : '';
+      : "";
 
     return (
       <span
         className={`px-2 py-1 text-xs rounded ${
           canExecute
-            ? 'bg-[#F97316]/10 text-[#F97316]'
-            : 'bg-yellow-500/10 text-yellow-500'
+            ? "bg-[#F97316]/10 text-[#F97316]"
+            : "bg-yellow-500/10 text-yellow-500"
         }`}
       >
         {canExecute
-          ? 'Forced Withdrawal Ready'
+          ? "Forced Withdrawal Ready"
           : `Forced Withdrawal Ready in ${timeRemaining}`}
       </span>
     );
   },
   (prev, next) =>
     prev.withdrawableAt === next.withdrawableAt &&
-    prev.canExecute === next.canExecute
+    prev.canExecute === next.canExecute,
 );

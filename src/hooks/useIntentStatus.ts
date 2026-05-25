@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
+import { useState, useEffect } from "react";
+import { getApiUrl } from "../config/api";
 
 export interface IntentTransactionStatus {
   status: string;
@@ -19,9 +19,11 @@ export function useIntentStatus(
   nonce: string | undefined,
   enabled: boolean = true,
   autoRefresh: boolean = false,
-  refreshInterval: number = 5000 // 5 seconds default
+  refreshInterval: number = 5000, // 5 seconds default
 ): UseIntentStatusResult {
-  const [statuses, setStatuses] = useState<IntentTransactionStatus[] | null>(null);
+  const [statuses, setStatuses] = useState<IntentTransactionStatus[] | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,11 +40,11 @@ export function useIntentStatus(
       const response = await fetch(
         getApiUrl(`/intentStatus/${address}/${nonce}`),
         {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -51,16 +53,18 @@ export function useIntentStatus(
           setStatuses([]);
           return;
         }
-        throw new Error(`Failed to fetch intent status: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch intent status: ${response.statusText}`,
+        );
       }
 
       const data: IntentTransactionStatus[] = await response.json();
       setStatuses(data);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch intent status';
+        err instanceof Error ? err.message : "Failed to fetch intent status";
       setError(errorMessage);
-      console.error('Error fetching intent status:', err);
+      console.error("Error fetching intent status:", err);
     } finally {
       setIsLoading(false);
     }

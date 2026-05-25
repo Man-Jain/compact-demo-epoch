@@ -76,7 +76,7 @@ export interface ChainInfo {
  */
 export function getChainsFromGraph(
   chainId: number,
-  options?: { excludeCurrentChain?: boolean }
+  options?: { excludeCurrentChain?: boolean },
 ): ChainInfo[] {
   const graph = getGraphForChain(chainId);
   const result: ChainInfo[] = [];

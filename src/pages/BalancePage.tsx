@@ -25,7 +25,11 @@ import {
   type SolveIntentParams,
 } from "@epoch-protocol/epoch-intents-sdk";
 import { ERC20_ABI } from "../constants/contracts";
-import { getTokensForChain, getChainsFromGraph, isTestnetChain } from "../config/web3";
+import {
+  getTokensForChain,
+  getChainsFromGraph,
+  isTestnetChain,
+} from "../config/web3";
 
 interface IntentTransactionStatus {
   status: string;

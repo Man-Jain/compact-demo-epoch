@@ -125,7 +125,7 @@ button.connect-wallet:hover {
   position: relative;
 }
 .underlined-text::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: 0;

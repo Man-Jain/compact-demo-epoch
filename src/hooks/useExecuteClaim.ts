@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNotification } from '../hooks/useNotification';
-import { getApiUrl } from '../config/api';
+import { useState } from "react";
+import { useNotification } from "../hooks/useNotification";
+import { getApiUrl } from "../config/api";
 
 export interface ClaimExecution {
   success: boolean;
@@ -16,41 +16,41 @@ export function useExecuteClaim() {
 
   const executeClaim = async (
     claimHash: string,
-    chainId: string
+    chainId: string,
   ): Promise<ClaimExecution> => {
     setIsLoading(true);
     setError(null);
 
     const tempTxId = `pending-${Date.now()}`;
     showNotification({
-      type: 'info',
-      title: 'Executing Claim',
-      message: 'Please wait while we execute your claim...',
-      stage: 'initiated',
+      type: "info",
+      title: "Executing Claim",
+      message: "Please wait while we execute your claim...",
+      stage: "initiated",
       txHash: tempTxId,
       chainId,
       autoHide: false,
     });
 
     try {
-      const response = await fetch(getApiUrl('/execute-claim'), {
-        method: 'POST',
+      const response = await fetch(getApiUrl("/execute-claim"), {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           claimHash,
           chainId,
           executionHash:
-            '0xe21ddb611bef3c4e0bc8ac1d85202a4739ff55f1382a231a228a451658567f4a',
-          claimant: '0xe1afC1092c40d32F72Ad065C93f6D27843458B95',
+            "0xe21ddb611bef3c4e0bc8ac1d85202a4739ff55f1382a231a228a451658567f4a",
+          claimant: "0xe1afC1092c40d32F72Ad065C93f6D27843458B95",
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || `HTTP error! status: ${response.status}`
+          errorData.error || `HTTP error! status: ${response.status}`,
         );
       }
 
@@ -59,19 +59,19 @@ export function useExecuteClaim() {
 
       if (claimExecution.success && claimExecution.transactionHash) {
         showNotification({
-          type: 'success',
-          title: 'Claim Executed',
-          message: 'Your claim has been successfully executed',
-          stage: 'confirmed',
+          type: "success",
+          title: "Claim Executed",
+          message: "Your claim has been successfully executed",
+          stage: "confirmed",
           txHash: claimExecution.transactionHash,
           chainId,
           autoHide: false,
         });
       } else {
         showNotification({
-          type: 'error',
-          title: 'Claim Execution Failed',
-          message: claimExecution.error || 'Failed to execute claim',
+          type: "error",
+          title: "Claim Execution Failed",
+          message: claimExecution.error || "Failed to execute claim",
           txHash: tempTxId,
           chainId,
           autoHide: true,
@@ -81,19 +81,19 @@ export function useExecuteClaim() {
       return claimExecution;
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to execute claim';
+        err instanceof Error ? err.message : "Failed to execute claim";
       setError(errorMessage);
 
       showNotification({
-        type: 'error',
-        title: 'Claim Execution Error',
+        type: "error",
+        title: "Claim Execution Error",
         message: errorMessage,
         txHash: tempTxId,
         chainId,
         autoHide: true,
       });
 
-      console.error('Error executing claim:', err);
+      console.error("Error executing claim:", err);
       return {
         success: false,
         error: errorMessage,

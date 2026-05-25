@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useAccount } from 'wagmi';
-import { useResourceLocks } from './useResourceLocks';
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useAccount } from "wagmi";
+import { useResourceLocks } from "./useResourceLocks";
 
 export interface Token {
   tokenAddress: string;
@@ -71,20 +71,20 @@ export function useBalances(): UseBalancesResult {
     //   }
     //   if (!response.ok) throw new Error('Failed to fetch balances.');
 
-      //   const data = await response.json();
-      //   // ... rest of processing code ...
-      //   setError(null);
-      // } catch (err) {
-      //   if (err instanceof Error && !err.message.includes('404')) {
-      //     setError(err.message);
-      //   } else {
-      //     setBalances([]);
-      //     setError(null);
-      //   }
-      // } finally {
-      //   setIsLoading(false);
-      //   isFetchingRef.current = false;
-      // }
+    //   const data = await response.json();
+    //   // ... rest of processing code ...
+    //   setError(null);
+    // } catch (err) {
+    //   if (err instanceof Error && !err.message.includes('404')) {
+    //     setError(err.message);
+    //   } else {
+    //     setBalances([]);
+    //     setError(null);
+    //   }
+    // } finally {
+    //   setIsLoading(false);
+    //   isFetchingRef.current = false;
+    // }
   }, [isConnected, address, resourceLocksData]);
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export function useBalances(): UseBalancesResult {
       setError(
         resourceLocksError instanceof Error
           ? resourceLocksError.message
-          : 'Failed to fetch resource locks'
+          : "Failed to fetch resource locks",
       );
     }
   }, [resourceLocksError]);
@@ -123,7 +123,7 @@ export function useBalances(): UseBalancesResult {
   // Only show loading state during initial load
   const showLoading = useMemo(
     () => isLoading && resourceLocksLoading,
-    [isLoading, resourceLocksLoading]
+    [isLoading, resourceLocksLoading],
   );
 
   return useMemo(
@@ -132,6 +132,6 @@ export function useBalances(): UseBalancesResult {
       error,
       isLoading: showLoading,
     }),
-    [balances, error, showLoading]
+    [balances, error, showLoading],
   );
 }

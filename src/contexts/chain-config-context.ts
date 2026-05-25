@@ -1,5 +1,5 @@
-import { createContext } from 'react';
-import { SupportedChains } from '../types/chain';
+import { createContext } from "react";
+import { SupportedChains } from "../types/chain";
 
 export interface ChainConfigContextType {
   supportedChains: SupportedChains | null;

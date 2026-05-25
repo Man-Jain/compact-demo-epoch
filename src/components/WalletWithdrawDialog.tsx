@@ -80,7 +80,8 @@ export function WalletWithdrawDialog({
       showNotification({
         type: "success",
         title: "Withdrawal initiated",
-        message: "Forced withdrawal enabled. You can complete the withdrawal once it becomes ready.",
+        message:
+          "Forced withdrawal enabled. You can complete the withdrawal once it becomes ready.",
         txHash: result.transactionHash,
         chainId,
         autoHide: true,
@@ -164,14 +165,13 @@ export function WalletWithdrawDialog({
         <h2 className="text-lg font-semibold text-white mb-4">
           Withdraw {symbol} (Compact)
         </h2>
-        <p className="text-sm text-gray-400 mb-4">
-          Deposit ID: {depositId}
-        </p>
+        <p className="text-sm text-gray-400 mb-4">Deposit ID: {depositId}</p>
 
         {withdrawStatus === "Disabled" && (
           <div className="space-y-4">
             <p className="text-gray-300 text-sm">
-              Initiate a forced withdrawal first. After a short waiting period you will be able to send tokens to a recipient.
+              Initiate a forced withdrawal first. After a short waiting period
+              you will be able to send tokens to a recipient.
             </p>
             <div className="flex gap-3 mt-6">
               <button
@@ -197,7 +197,8 @@ export function WalletWithdrawDialog({
         {withdrawStatus === "Pending" && (
           <div className="space-y-4">
             <p className="text-gray-300 text-sm">
-              Withdrawal is pending. Please wait until it becomes ready, then open this dialog again to complete the withdrawal.
+              Withdrawal is pending. Please wait until it becomes ready, then
+              open this dialog again to complete the withdrawal.
             </p>
             <div className="flex gap-3 mt-6">
               <button
@@ -215,7 +216,9 @@ export function WalletWithdrawDialog({
           <>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Recipient</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Recipient
+                </label>
                 <input
                   type="text"
                   value={recipient}
@@ -228,7 +231,9 @@ export function WalletWithdrawDialog({
                 )}
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Amount</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Amount
+                </label>
                 <input
                   type="text"
                   value={amount}

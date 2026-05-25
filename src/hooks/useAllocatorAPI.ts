@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
+import { useState, useEffect } from "react";
+import { getApiUrl } from "../config/api";
 
 interface HealthCheckResponse {
   status: string;
@@ -54,9 +54,9 @@ export function useAllocatorAPI() {
   useEffect(() => {
     const fetchHealthCheck = async () => {
       try {
-        const response = await fetch(getApiUrl('/health'));
+        const response = await fetch(getApiUrl("/health"));
         if (!response.ok) {
-          throw new Error('Health check failed');
+          throw new Error("Health check failed");
         }
         const data: HealthCheckResponse = await response.json();
         setAllocatorAddress(data.allocatorAddress);
@@ -65,7 +65,7 @@ export function useAllocatorAPI() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Failed to fetch allocator address'
+            : "Failed to fetch allocator address",
         );
         setAllocatorAddress(null);
       } finally {
@@ -78,14 +78,14 @@ export function useAllocatorAPI() {
 
   const createAllocation = async (
     sessionToken: string,
-    request: CompactRequest
+    request: CompactRequest,
   ): Promise<CompactResponse> => {
-    console.log('request: ', request);
-    const response = await fetch(getApiUrl('/compact'), {
-      method: 'POST',
+    console.log("request: ", request);
+    const response = await fetch(getApiUrl("/compact"), {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-session-id': sessionToken,
+        "Content-Type": "application/json",
+        "x-session-id": sessionToken,
       },
       body: JSON.stringify(request),
     });
@@ -93,9 +93,10 @@ export function useAllocatorAPI() {
     if (!response.ok) {
       const errorData = await response
         .json()
-        .catch(() => ({ error: 'Unknown error' }));
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(
-        errorData.error || `Failed to create allocation: ${response.statusText}`
+        errorData.error ||
+          `Failed to create allocation: ${response.statusText}`,
       );
     }
 
@@ -104,18 +105,20 @@ export function useAllocatorAPI() {
 
   const getResourceLockDecimals = async (
     chainId: string,
-    lockId: string
+    lockId: string,
   ): Promise<number> => {
     try {
       // Query the indexer for resource lock details including token decimals
-      const response = await fetch(getApiUrl(`/resourceLock/${chainId}/${lockId}`));
+      const response = await fetch(
+        getApiUrl(`/resourceLock/${chainId}/${lockId}`),
+      );
       if (!response.ok) {
-        throw new Error('Failed to fetch resource lock details');
+        throw new Error("Failed to fetch resource lock details");
       }
       const data = await response.json();
       return data.token?.decimals || 18; // Default to 18 if not found
     } catch (err) {
-      console.error('Error fetching resource lock decimals:', err);
+      console.error("Error fetching resource lock decimals:", err);
       return 18; // Default to 18 decimals on error
     }
   };
@@ -134,14 +137,14 @@ export function useAllocatorAPI() {
         witnessTypeString: string | null;
         witnessHash: string | null;
       };
-    }
+    },
   ): Promise<{ hash: string }> => {
-    console.log('params: ', params);
-    const response = await fetch(getApiUrl('/claim-hash'), {
-      method: 'POST',
+    console.log("params: ", params);
+    const response = await fetch(getApiUrl("/claim-hash"), {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-session-id': sessionToken,
+        "Content-Type": "application/json",
+        "x-session-id": sessionToken,
       },
       body: JSON.stringify(params),
     });
@@ -149,10 +152,10 @@ export function useAllocatorAPI() {
     if (!response.ok) {
       const errorData = await response
         .json()
-        .catch(() => ({ error: 'Unknown error' }));
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(
         errorData.error ||
-          `Failed to generate claim hash: ${response.statusText}`
+          `Failed to generate claim hash: ${response.statusText}`,
       );
     }
 

@@ -1,5 +1,5 @@
-import { Address, Hex } from 'viem';
-import { chains } from '../config/wagmi';
+import { Address, Hex } from "viem";
+import { chains } from "../config/wagmi";
 
 /**
  * Get the name of a chain by its ID
@@ -8,7 +8,7 @@ import { chains } from '../config/wagmi';
  */
 export function getChainName(chainId: string | number): string {
   // Convert chainId to number if it's a string
-  const id = typeof chainId === 'string' ? parseInt(chainId) : chainId;
+  const id = typeof chainId === "string" ? parseInt(chainId) : chainId;
 
   // Find the chain in wagmi config
   const chain = chains.find((chain) => chain.id === id);
@@ -25,10 +25,10 @@ export function getChainName(chainId: string | number): string {
  */
 export function getBlockExplorerTxUrl(
   chainId: string | number,
-  txHash: string
+  txHash: string,
 ): string | null {
   // Convert chainId to number if it's a string
-  const id = typeof chainId === 'string' ? parseInt(chainId) : chainId;
+  const id = typeof chainId === "string" ? parseInt(chainId) : chainId;
 
   // Find the chain in wagmi config
   const chain = chains.find((chain) => chain.id === id);
@@ -48,7 +48,7 @@ export function getBlockExplorerTxUrl(
 export function createLockTag(
   resetPeriod: bigint, // 0 = OneSecond, 1 = FifteenSeconds, 2 = OneMinute, 3 = TenMinutes, 4 = OneHourAndFiveMinutes, 5 = OneDay, 6 = SevenDaysAndOneHour, 7 = ThirtyDays
   scope: bigint, // 0 = Multichain, 1 = ChainSpecific
-  allocatorId: bigint
+  allocatorId: bigint,
 ): bigint {
   return (scope << 95n) | (resetPeriod << 92n) | allocatorId;
 }
@@ -109,28 +109,28 @@ export async function getSignedCompact(
   client: any,
   theCompact: Address,
   message: CompactData,
-  chainId: number
+  chainId: number,
 ) {
   // Convert lockTag bigint to bytes12 hex string and token bigint to address
   const messageWithFormattedData = {
     ...message,
-    lockTag: `0x${message.lockTag.toString(16).padStart(24, '0')}` as Hex,
+    lockTag: `0x${message.lockTag.toString(16).padStart(24, "0")}` as Hex,
     token:
-      typeof message.token === 'bigint'
-        ? (`0x${message.token.toString(16).padStart(40, '0')}` as Address)
+      typeof message.token === "bigint"
+        ? (`0x${message.token.toString(16).padStart(40, "0")}` as Address)
         : message.token,
   };
-  console.log('messageWithFormattedData: ', messageWithFormattedData);
+  console.log("messageWithFormattedData: ", messageWithFormattedData);
 
   return client.signTypedData({
     domain: {
-      name: 'The Compact',
-      version: '1',
+      name: "The Compact",
+      version: "1",
       chainId: chainId,
       verifyingContract: theCompact,
     },
     types: getTypes(message),
-    primaryType: 'Compact',
+    primaryType: "Compact",
     message: messageWithFormattedData,
   });
 }
@@ -138,21 +138,21 @@ export async function getSignedCompact(
 function getTypes(message: CompactData) {
   return {
     Compact: [
-      { name: 'arbiter', type: 'address' },
-      { name: 'sponsor', type: 'address' },
-      { name: 'nonce', type: 'uint256' },
-      { name: 'expires', type: 'uint256' },
-      { name: 'lockTag', type: 'bytes12' },
-      { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-      ...(message.mandate ? [{ name: 'mandate', type: 'Mandate' }] : []),
+      { name: "arbiter", type: "address" },
+      { name: "sponsor", type: "address" },
+      { name: "nonce", type: "uint256" },
+      { name: "expires", type: "uint256" },
+      { name: "lockTag", type: "bytes12" },
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      ...(message.mandate ? [{ name: "mandate", type: "Mandate" }] : []),
     ],
     ...(message.mandate
       ? {
           Mandate: [
-            { name: 'tokenOut', type: 'address' },
-            { name: 'minTokenOut', type: 'uint256' },
-            { name: 'chainId', type: 'uint256' },
+            { name: "tokenOut", type: "address" },
+            { name: "minTokenOut", type: "uint256" },
+            { name: "chainId", type: "uint256" },
           ],
         }
       : {}),
