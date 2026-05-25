@@ -1,21 +1,21 @@
-import { Fragment, ReactNode, useState, useEffect, useCallback } from 'react';
-import { Transition } from '@headlessui/react';
+import { Fragment, ReactNode, useState, useEffect, useCallback } from "react";
+import { Transition } from "@headlessui/react";
 import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
-} from '@heroicons/react/24/outline';
-import { XMarkIcon } from '@heroicons/react/20/solid';
-import { NotificationContext } from './notification-context';
-import { getBlockExplorerTxUrl } from '../utils/chains';
+} from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/20/solid";
+import { NotificationContext } from "./notification-context";
+import { getBlockExplorerTxUrl } from "../utils/chains";
 
 interface Notification {
   id: string;
-  type: 'success' | 'error' | 'warning' | 'info';
+  type: "success" | "error" | "warning" | "info";
   title: string;
   message: string;
   timestamp: number;
-  stage?: 'initiated' | 'submitted' | 'confirmed';
+  stage?: "initiated" | "submitted" | "confirmed";
   txHash?: string;
   chainId?: number | string;
   autoHide?: boolean;
@@ -26,10 +26,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const showNotification = useCallback(
     (notification: {
-      type: 'success' | 'error' | 'warning' | 'info';
+      type: "success" | "error" | "warning" | "info";
       title: string;
       message: string;
-      stage?: 'initiated' | 'submitted' | 'confirmed';
+      stage?: "initiated" | "submitted" | "confirmed";
       txHash?: string;
       chainId?: number | string;
       autoHide?: boolean;
@@ -43,18 +43,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           // If this is a staged notification
           if (notification.stage) {
             // If we have a txHash, check if it's a temp ID (starts with 'pending-')
-            const currentTxHash = notification.txHash || '';
-            const prevTxHash = n.txHash || '';
+            const currentTxHash = notification.txHash || "";
+            const prevTxHash = n.txHash || "";
 
             // Consider notifications part of the same transaction if:
             // 1. They have the same txHash, or
             // 2. One has a temp ID and the other has a real hash
             const isRelatedTx =
               currentTxHash === prevTxHash ||
-              (currentTxHash.startsWith('pending-') &&
-                !prevTxHash.startsWith('pending-')) ||
-              (!currentTxHash.startsWith('pending-') &&
-                prevTxHash.startsWith('pending-'));
+              (currentTxHash.startsWith("pending-") &&
+                !prevTxHash.startsWith("pending-")) ||
+              (!currentTxHash.startsWith("pending-") &&
+                prevTxHash.startsWith("pending-"));
 
             // Remove all previous stages of the same transaction
             if (isRelatedTx) {
@@ -75,7 +75,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return [...filtered, { ...notification, id, timestamp }];
       });
     },
-    []
+    [],
   ); // Memoize showNotification
 
   // Remove notifications after 5 seconds if autoHide is true (default)
@@ -86,7 +86,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return prev.filter(
           (notification) =>
             notification.autoHide === false ||
-            now - notification.timestamp < 5000
+            now - notification.timestamp < 5000,
         );
       });
     }, 100);
@@ -96,8 +96,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const getIcon = (notification: Notification) => {
     if (
-      notification.stage === 'initiated' ||
-      notification.stage === 'submitted'
+      notification.stage === "initiated" ||
+      notification.stage === "submitted"
     ) {
       return (
         <ClockIcon
@@ -108,18 +108,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
 
     switch (notification.type) {
-      case 'success':
+      case "success":
         return (
           <CheckCircleIcon
             className="h-6 w-6 text-[#00ff00]"
             aria-hidden="true"
           />
         );
-      case 'error':
+      case "error":
         return (
           <XCircleIcon className="h-6 w-6 text-red-400" aria-hidden="true" />
         );
-      case 'warning':
+      case "warning":
         return (
           <XCircleIcon className="h-6 w-6 text-yellow-400" aria-hidden="true" />
         );
@@ -134,7 +134,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   const renderTransactionHash = (notification: Notification) => {
-    if (!notification.txHash || !notification.txHash.startsWith('0x')) {
+    if (!notification.txHash || !notification.txHash.startsWith("0x")) {
       return null;
     }
 
@@ -143,12 +143,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (notification.chainId) {
       const explorerUrl = getBlockExplorerTxUrl(
         notification.chainId,
-        notification.txHash
+        notification.txHash,
       );
       if (explorerUrl) {
         return (
           <p className="mt-1 text-sm text-gray-500">
-            Transaction:{' '}
+            Transaction:{" "}
             <a
               href={explorerUrl}
               target="_blank"
@@ -207,7 +207,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                         className="inline-flex rounded-md bg-[#0a0a0a] text-gray-500 hover:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00ff00] focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
                         onClick={() => {
                           setNotifications((prev) =>
-                            prev.filter((n) => n.id !== notification.id)
+                            prev.filter((n) => n.id !== notification.id),
                           );
                         }}
                       >

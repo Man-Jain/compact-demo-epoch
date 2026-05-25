@@ -1,6 +1,6 @@
-import { useCompact } from '../hooks/useCompact';
-import { useNotification } from '../hooks/useNotification';
-import { useChainId } from 'wagmi';
+import { useCompact } from "../hooks/useCompact";
+import { useNotification } from "../hooks/useNotification";
+import { useChainId } from "wagmi";
 
 interface InitiateForcedWithdrawalDialogProps {
   isOpen: boolean;
@@ -32,20 +32,20 @@ export function InitiateForcedWithdrawalDialog({
         onClose();
       }
     } catch (error: unknown) {
-      console.error('Error initiating forced withdrawal:', error);
+      console.error("Error initiating forced withdrawal:", error);
       if (
         !(
           error instanceof Error &&
-          error.message.toLowerCase().includes('user rejected')
+          error.message.toLowerCase().includes("user rejected")
         )
       ) {
         showNotification({
-          type: 'error',
-          title: 'Transaction Failed',
+          type: "error",
+          title: "Transaction Failed",
           message:
             error instanceof Error
               ? error.message
-              : 'Failed to initiate forced withdrawal',
+              : "Failed to initiate forced withdrawal",
           chainId,
         });
       }
@@ -95,7 +95,7 @@ export function InitiateForcedWithdrawalDialog({
               <div className="mt-2 text-sm text-yellow-400/80">
                 <p>
                   Initiating a forced withdrawal from this resource lock will
-                  start a timelock period lasting{' '}
+                  start a timelock period lasting{" "}
                   {formatResetPeriod(resetPeriod)}. You will need to wait for
                   this period to end, then submit another transaction to perform
                   the forced withdrawal from this resource lock. To begin using
@@ -120,7 +120,7 @@ export function InitiateForcedWithdrawalDialog({
             className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isConfirming}
           >
-            {isConfirming ? 'Initiating...' : 'Initiate'}
+            {isConfirming ? "Initiating..." : "Initiate"}
           </button>
         </div>
       </div>

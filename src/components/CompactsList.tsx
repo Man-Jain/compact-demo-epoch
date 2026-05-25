@@ -1,16 +1,16 @@
-import React from 'react';
-import { useCompacts, CompactRecord } from '../hooks/useCompacts';
-import { useExecuteClaim } from '../hooks/useExecuteClaim';
+import React from "react";
+import { useCompacts, CompactRecord } from "../hooks/useCompacts";
+import { useExecuteClaim } from "../hooks/useExecuteClaim";
 import {
   formatAddress,
   formatAmount,
   formatTimestamp,
-} from '../utils/formatting';
-import { useAccount } from 'wagmi';
+} from "../utils/formatting";
+import { useAccount } from "wagmi";
 
 const CompactsList: React.FC = () => {
   const { address } = useAccount();
-  const { compacts, isLoading, error, refetch } = useCompacts(address ?? '');
+  const { compacts, isLoading, error, refetch } = useCompacts(address ?? "");
 
   if (isLoading) {
     return (
@@ -29,7 +29,9 @@ const CompactsList: React.FC = () => {
       <div className="p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
         <h2 className="text-xl font-bold text-white mb-4">Your Compacts</h2>
         <div className="text-center py-12">
-          <div className="text-red-400 mb-2 text-lg">⚠️ Error loading compacts</div>
+          <div className="text-red-400 mb-2 text-lg">
+            ⚠️ Error loading compacts
+          </div>
           <div className="text-gray-400 text-sm mb-6">{error}</div>
           <button
             onClick={refetch}
@@ -104,17 +106,17 @@ const CompactCard: React.FC<CompactCardProps> = ({ compact }) => {
       // We need to convert it to the r, s, v format expected by the backend
 
       const result = await executeClaim(compact.hash, compact.chainId);
-      console.log('result: ', result);
+      console.log("result: ", result);
 
       if (result.success) {
         setClaimSuccess(true);
         // Optionally refresh the compacts list or show success message
       } else {
-        setClaimError(result.error || 'Failed to execute claim');
+        setClaimError(result.error || "Failed to execute claim");
       }
     } catch (error) {
       setClaimError(
-        error instanceof Error ? error.message : 'Unknown error occurred'
+        error instanceof Error ? error.message : "Unknown error occurred",
       );
     } finally {
       setIsClaiming(false);
@@ -132,11 +134,11 @@ const CompactCard: React.FC<CompactCardProps> = ({ compact }) => {
             <span
               className={`px-3 py-1 rounded-md text-xs font-semibold ${
                 isExpired
-                  ? 'bg-red-900/30 text-red-300 border border-red-700/50'
-                  : 'bg-green-900/30 text-green-300 border border-green-700/50'
+                  ? "bg-red-900/30 text-red-300 border border-red-700/50"
+                  : "bg-green-900/30 text-green-300 border border-green-700/50"
               }`}
             >
-              {isExpired ? 'Expired' : 'Active'}
+              {isExpired ? "Expired" : "Active"}
             </span>
           </div>
 
@@ -174,21 +176,21 @@ const CompactCard: React.FC<CompactCardProps> = ({ compact }) => {
             disabled={isClaiming || isExpired || claimSuccess}
             className={`px-4 py-2 text-sm rounded-lg transition-colors font-medium ${
               isClaiming
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                ? "bg-gray-600 text-gray-400 cursor-not-allowed"
                 : isExpired
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  ? "bg-gray-600 text-gray-400 cursor-not-allowed"
                   : claimSuccess
-                    ? 'bg-green-600 text-white cursor-not-allowed'
-                    : 'bg-[#00ff00] text-black hover:bg-[#00dd00]'
+                    ? "bg-green-600 text-white cursor-not-allowed"
+                    : "bg-[#00ff00] text-black hover:bg-[#00dd00]"
             }`}
           >
-            {isClaiming ? 'Claiming...' : claimSuccess ? 'Claimed' : 'Claim'}
+            {isClaiming ? "Claiming..." : claimSuccess ? "Claimed" : "Claim"}
           </button>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors font-medium"
           >
-            {isExpanded ? 'Hide' : 'Details'}
+            {isExpanded ? "Hide" : "Details"}
           </button>
         </div>
       </div>

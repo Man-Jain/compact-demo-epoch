@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
+import { useState, useEffect } from "react";
+import { getApiUrl } from "../config/api";
 
 export interface CompactData {
   arbiter: string;
@@ -46,7 +46,7 @@ export function useCompacts(address: string | null) {
 
     try {
       const response = await fetch(getApiUrl(`/compacts?address=${address}`), {
-        method: 'GET',
+        method: "GET",
         // headers: {
         //   'Content-Type': 'application/json',
         //   'x-session-id': sessionToken,
@@ -66,9 +66,9 @@ export function useCompacts(address: string | null) {
       setCompacts(data);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch compacts';
+        err instanceof Error ? err.message : "Failed to fetch compacts";
       setError(errorMessage);
-      console.error('Error fetching compacts:', err);
+      console.error("Error fetching compacts:", err);
     } finally {
       setIsLoading(false);
     }

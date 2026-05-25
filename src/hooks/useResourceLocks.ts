@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useAccount } from 'wagmi';
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useAccount } from "wagmi";
 
 export interface Token {
   tokenAddress: string;
@@ -130,6 +130,6 @@ export function useResourceLocks(): UseResourceLocksResult {
       isLoading,
       error,
     }),
-    [data, isLoading, error]
+    [data, isLoading, error],
   );
 }

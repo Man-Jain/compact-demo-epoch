@@ -1,8 +1,8 @@
-import React from 'react';
+import React from "react";
 import {
   ChainConfigContext,
   ChainConfigContextType,
-} from './chain-config-context';
+} from "./chain-config-context";
 
 interface ChainConfigProviderProps {
   children: React.ReactNode;

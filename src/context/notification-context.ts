@@ -1,11 +1,11 @@
-import { createContext } from 'react';
+import { createContext } from "react";
 
 interface NotificationContextType {
   showNotification: (notification: {
-    type: 'success' | 'error' | 'warning' | 'info';
+    type: "success" | "error" | "warning" | "info";
     title: string;
     message: string;
-    stage?: 'initiated' | 'submitted' | 'confirmed';
+    stage?: "initiated" | "submitted" | "confirmed";
     txHash?: string;
     chainId?: number | string;
     autoHide?: boolean;

@@ -1,10 +1,10 @@
 export function formatTimeRemaining(
   expiryTimestamp: number,
-  currentTime: number
+  currentTime: number,
 ): string {
   const diff = expiryTimestamp - currentTime;
 
-  if (diff <= 0) return 'Ready';
+  if (diff <= 0) return "Ready";
 
   const days = Math.floor(diff / (24 * 60 * 60));
   const hours = Math.floor((diff % (24 * 60 * 60)) / (60 * 60));
@@ -25,7 +25,7 @@ export function formatResetPeriod(seconds: number): string {
 }
 
 export function formatAddress(address: string): string {
-  if (!address) return '';
+  if (!address) return "";
   if (address.length < 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
@@ -43,7 +43,7 @@ export function formatAmount(amount: string): string {
 export function formatTimestamp(timestamp: string): string {
   try {
     // Handle both Unix timestamp (seconds) and ISO string
-    const date = timestamp.includes('T')
+    const date = timestamp.includes("T")
       ? new Date(timestamp)
       : new Date(parseInt(timestamp) * 1000);
 
