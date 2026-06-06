@@ -1,4 +1,5 @@
 import { mainnetGraph, testnetGraph } from "@epoch-protocol/epoch-intents-sdk";
+import { getAddress, isAddress } from "viem";
 
 // Graph shape from epoch-commons-sdk: tokens keyed by symbol, chains keyed by chain name
 type GraphChain = { chainId: number; explorer: string };
@@ -40,6 +41,13 @@ export interface TokenInfo {
   decimals: number;
 }
 
+function normalizeGraphAddress(address: string): string {
+  if (isAddress(address)) {
+    return getAddress(address);
+  }
+  return address;
+}
+
 /**
  * Get list of tokens for a chain from the appropriate graph (mainnet or testnet).
  * Returns tokens that have a contract address for the given chain.
@@ -51,12 +59,12 @@ export function getTokensForChain(chainId: number): TokenInfo[] {
 
   const result: TokenInfo[] = [];
   for (const [symbol, token] of Object.entries(graph.tokens)) {
-    const address =
+    const rawAddress =
       token.contractAddress[chainName] ?? token.contractAddress["*"];
-    if (address) {
+    if (rawAddress) {
       result.push({
         symbol,
-        address,
+        address: normalizeGraphAddress(rawAddress),
         decimals: token.decimals,
       });
     }

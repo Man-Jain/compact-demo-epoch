@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: {
+      alias: {
+        "@epoch-protocol/epoch-intents-sdk": path.resolve(
+          __dirname,
+          "../smallocator/sdk/dist/index.js",
+        ),
+      },
+    },
     server: {
       port: parseInt(devPort),
       strictPort: false, // Try next available port if port is in use

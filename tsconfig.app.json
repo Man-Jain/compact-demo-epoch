@@ -32,7 +32,10 @@
     /* Path resolution */
     "baseUrl": ".",
     "paths": {
-      "src/*": ["./src/*"]
+      "src/*": ["./src/*"],
+      "@epoch-protocol/epoch-intents-sdk": [
+        "../smallocator/sdk/dist/index.d.ts"
+      ]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
