@@ -16,7 +16,7 @@
     "*.{ts,tsx,js,json,md,css}": "prettier --write"
   },
   "dependencies": {
-    "@epoch-protocol/epoch-intents-sdk": "file:../smallocator/sdk",
+    "@epoch-protocol/epoch-intents-sdk": "^1.0.23",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@rainbow-me/rainbowkit": "^2.2.1",
