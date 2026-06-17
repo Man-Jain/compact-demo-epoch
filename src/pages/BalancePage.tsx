@@ -9,8 +9,9 @@ import {
 import { parseUnits } from "viem";
 import { useNotification } from "../hooks/useNotification";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
-import { useERC20 } from "../hooks/useERC20";
+import { useTokenOnChain } from "../hooks/useTokenOnChain";
 import { useCompact } from "../hooks/useCompact";
+import { TokenAddressInput } from "../components/TokenAddressInput";
 import { useCreateAllocation } from "../hooks/useCreateAllocation";
 import { useChainConfig } from "../hooks/use-chain-config";
 import { getChainName, getBlockExplorerTxUrl } from "../utils/chains";
@@ -23,7 +24,12 @@ import {
   TaskType,
   type IntentQuoteResult,
   type SolveIntentParams,
+  type TransactionExecutionStatus,
 } from "@epoch-protocol/epoch-intents-sdk";
+import {
+  EXECUTION_STATUS_NOTIFICATION_ID,
+  getExecutionStatusNotification,
+} from "../utils/executionStatusNotifications";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -64,6 +70,9 @@ export default function BalancePage() {
   }, [inputAmountDisplay]);
 
   const [destinationChainId, setDestinationChainId] = useState("");
+  const [faucetToken, setFaucetToken] = useState<string>("");
+  const [faucetAmount, setFaucetAmount] = useState("100");
+  const [isMinting, setIsMinting] = useState(false);
   const [nonce, setNonce] = useState<string | null>(null);
   const [intentStatus, setIntentStatus] = useState<
     IntentTransactionStatus[] | null
@@ -89,28 +98,23 @@ export default function BalancePage() {
     return getTokensForChain(id);
   }, [destinationChainId]);
 
-  // Sync deposit and faucet token when source chain / graph tokens change
+  const prevSourceChainRef = useRef<number | null>(null);
+  const prevDestinationChainRef = useRef<string | null>(null);
+
+  // Initialize defaults only when source chain changes (never while user is editing).
   useEffect(() => {
+    if (prevSourceChainRef.current === chainId) return;
+    prevSourceChainRef.current = chainId;
     if (graphTokens.length === 0) return;
-    const first = graphTokens[0];
-    const hasDeposit = graphTokens.some(
-      (t) => t.address === depositTokenAddress,
-    );
-    const hasFaucet = graphTokens.some((t) => t.address === faucetToken);
-    if (!depositTokenAddress || !hasDeposit)
-      setDepositTokenAddress(first.address);
-    if (!faucetToken || !hasFaucet) setFaucetToken(first.address);
+    setDepositTokenAddress(graphTokens[0].address);
+    setFaucetToken(graphTokens[0].address);
   }, [chainId, graphTokens]);
 
-  // Sync output token when destination chain (and thus outputTokenOptions) changes
   useEffect(() => {
+    if (prevDestinationChainRef.current === destinationChainId) return;
+    prevDestinationChainRef.current = destinationChainId;
     if (outputTokenOptions.length === 0) return;
-    const hasOutput = outputTokenOptions.some(
-      (t) => t.address === outputTokenAddress,
-    );
-    if (!outputTokenAddress || !hasOutput) {
-      setOutputTokenAddress(outputTokenOptions[0].address);
-    }
+    setOutputTokenAddress(outputTokenOptions[0].address);
   }, [destinationChainId, outputTokenOptions]);
 
   useEffect(() => {
@@ -123,15 +127,9 @@ export default function BalancePage() {
     }
   }, [chainId, destinationChains]);
 
-  // Faucet state
-  const [faucetToken, setFaucetToken] = useState<string>("");
-  const [faucetAmount, setFaucetAmount] = useState("100");
-  const [isMinting, setIsMinting] = useState(false);
-
-  // Output token lives on destination chain; use graph data, not useERC20 (which reads current chain)
-  const selectedOutputToken = outputTokenOptions.find(
-    (t) => t.address === outputTokenAddress,
-  );
+  const destinationChainIdNumber = destinationChainId
+    ? parseInt(destinationChainId, 10)
+    : undefined;
 
   const {
     isValid: isValidDeposit,
@@ -139,10 +137,26 @@ export default function BalancePage() {
     decimals: depositDecimals,
     balance: depositBalance,
     symbol: depositSymbol,
-  } = useERC20(
-    tokenType === "erc20" && depositTokenAddress
-      ? (depositTokenAddress as `0x${string}`)
-      : undefined,
+    checksumAddress: depositChecksumAddress,
+    resolutionError: depositResolutionError,
+    source: depositSource,
+  } = useTokenOnChain(
+    tokenType === "erc20" ? chainId : undefined,
+    tokenType === "erc20" ? depositTokenAddress : undefined,
+    { includeBalance: true, walletAddress: address },
+  );
+
+  const {
+    isValid: isValidOutput,
+    isLoading: isLoadingOutput,
+    decimals: outputDecimals,
+    symbol: outputSymbol,
+    checksumAddress: outputChecksumAddress,
+    resolutionError: outputResolutionError,
+    source: outputSource,
+  } = useTokenOnChain(
+    tokenType === "erc20" ? destinationChainIdNumber : undefined,
+    tokenType === "erc20" ? outputTokenAddress : undefined,
   );
 
   // const { solveWithSolver, isLoading: isLoadingSolveWithSolver } =
@@ -181,19 +195,16 @@ export default function BalancePage() {
     if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
     if (tokenType === "erc20") {
-      // Output token: validated from graph (destination chain), not useERC20
-      if (!outputTokenAddress || !selectedOutputToken) return false;
-      if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
+      if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
         return false;
+      if (!depositChecksumAddress || !isValidDeposit || isLoadingDeposit)
+        return false;
+      if (outputDecimals === undefined) return false;
+      if (depositDecimals === undefined) return false;
 
       try {
-        // decimal check for output amount (use output token decimals from graph)
-        const outputDecimals = selectedOutputToken.decimals;
-        if (outputDecimals !== undefined) {
-          const parts = outputAmount.split(".");
-          if (parts.length > 1 && parts[1].length > outputDecimals)
-            return false;
-        }
+        const parts = outputAmount.split(".");
+        if (parts.length > 1 && parts[1].length > outputDecimals) return false;
       } catch {
         return false;
       }
@@ -206,11 +217,14 @@ export default function BalancePage() {
     inputAmountDisplay,
     outputAmount,
     tokenType,
-    outputTokenAddress,
-    selectedOutputToken,
-    depositTokenAddress,
+    outputChecksumAddress,
+    isValidOutput,
+    isLoadingOutput,
+    outputDecimals,
+    depositChecksumAddress,
     isValidDeposit,
     isLoadingDeposit,
+    depositDecimals,
   ]);
 
   const canFetchQuote = useMemo(() => {
@@ -218,9 +232,12 @@ export default function BalancePage() {
     if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
     if (tokenType === "erc20") {
-      if (!outputTokenAddress || !selectedOutputToken) return false;
-      if (!depositTokenAddress || !isValidDeposit || isLoadingDeposit)
+      if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
         return false;
+      if (!depositChecksumAddress || !isValidDeposit || isLoadingDeposit)
+        return false;
+      if (outputDecimals === undefined) return false;
+      if (depositDecimals === undefined) return false;
     }
     return true;
   }, [
@@ -230,11 +247,14 @@ export default function BalancePage() {
     inputAmountDisplay,
     outputAmount,
     tokenType,
-    outputTokenAddress,
-    selectedOutputToken,
-    depositTokenAddress,
+    outputChecksumAddress,
+    isValidOutput,
+    isLoadingOutput,
+    outputDecimals,
+    depositChecksumAddress,
     isValidDeposit,
     isLoadingDeposit,
+    depositDecimals,
   ]);
 
   const fetchIntentQuote = async () => {
@@ -251,15 +271,15 @@ export default function BalancePage() {
         taskType: TaskType.GetTokenOut,
         intentData: {
           isNative: tokenType === "native",
-          depositTokenAddress,
+          depositTokenAddress: depositChecksumAddress!,
           tokenInAmount: parseUnits(
             inputAmountDisplay || "0",
             depositDecimals ?? 18,
           ).toString(),
-          outputTokenAddress,
+          outputTokenAddress: outputChecksumAddress!,
           minTokenOut: parseUnits(
             outputAmount || "0",
-            selectedOutputToken?.decimals ?? 18,
+            outputDecimals ?? 18,
           ).toString(),
           destinationChainId: destinationChainId,
           protocolHashIdentifier:
@@ -324,15 +344,15 @@ export default function BalancePage() {
         taskType: TaskType.GetTokenOut,
         intentData: {
           isNative: tokenType === "native",
-          depositTokenAddress,
+          depositTokenAddress: depositChecksumAddress!,
           tokenInAmount: parseUnits(
             inputAmountDisplay || "0",
             depositDecimals ?? 18,
           ).toString(),
-          outputTokenAddress,
+          outputTokenAddress: outputChecksumAddress!,
           minTokenOut: parseUnits(
             outputAmount || "0",
-            selectedOutputToken?.decimals ?? 18,
+            outputDecimals ?? 18,
           ).toString(),
           destinationChainId: destinationChainId,
           protocolHashIdentifier:
@@ -358,12 +378,30 @@ export default function BalancePage() {
         return;
       }
 
+      const reportExecutionStatus = (status: TransactionExecutionStatus) => {
+        const notification = getExecutionStatusNotification(status);
+        if (notification) {
+          showNotification(notification);
+        }
+      };
+
+      showNotification({
+        type: "info",
+        title: "Submitting intent",
+        message: "Starting transaction execution…",
+        stage: "initiated",
+        txHash: EXECUTION_STATUS_NOTIFICATION_ID,
+        chainId,
+        autoHide: false,
+      });
+
       const params: SolveIntentParams = {
         isNative: false,
         sponsorAddress: address as `0x${string}`,
         taskTypeString,
         intentData,
         quoteResult,
+        onExecutionStatus: reportExecutionStatus,
       };
       const data = await epochSdk.solveIntent(params);
       console.log("data: ", data);
@@ -577,56 +615,34 @@ export default function BalancePage() {
               </div>
 
               {tokenType === "erc20" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Output Token
-                  </label>
-                  <select
-                    value={outputTokenAddress}
-                    onChange={(e) => setOutputTokenAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  >
-                    {outputTokenOptions.map((token) => (
-                      <option key={token.address} value={token.address}>
-                        {token.symbol}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-1 text-xs text-gray-400 font-mono">
-                    {outputTokenAddress}
-                  </div>
-                </div>
+                <TokenAddressInput
+                  label="Output Token Address (destination chain)"
+                  value={outputTokenAddress}
+                  onChange={setOutputTokenAddress}
+                  suggestions={outputTokenOptions}
+                  symbol={outputSymbol}
+                  decimals={outputDecimals}
+                  isLoading={isLoadingOutput}
+                  isResolved={isValidOutput}
+                  resolutionError={outputResolutionError}
+                  source={outputSource}
+                />
               )}
 
               {tokenType === "erc20" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Input Token Address
-                  </label>
-                  <select
-                    value={depositTokenAddress}
-                    onChange={(e) => setDepositTokenAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  >
-                    {graphTokens.map((token) => (
-                      <option key={token.address} value={token.address}>
-                        {token.symbol}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-1 text-xs text-gray-400 font-mono">
-                    {depositTokenAddress}
-                  </div>
-                  {depositBalance && depositSymbol && (
-                    <div className="mt-1 text-xs text-gray-400">
-                      Balance:{" "}
-                      {parseFloat(depositBalance).toLocaleString(undefined, {
-                        maximumFractionDigits: 6,
-                      })}{" "}
-                      {depositSymbol}
-                    </div>
-                  )}
-                </div>
+                <TokenAddressInput
+                  label="Input Token Address (source chain)"
+                  value={depositTokenAddress}
+                  onChange={setDepositTokenAddress}
+                  suggestions={graphTokens}
+                  symbol={depositSymbol}
+                  decimals={depositDecimals}
+                  balance={depositBalance}
+                  isLoading={isLoadingDeposit}
+                  isResolved={isValidDeposit}
+                  resolutionError={depositResolutionError}
+                  source={depositSource}
+                />
               )}
 
               <div>
