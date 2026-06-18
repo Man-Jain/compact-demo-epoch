@@ -1,5 +1,6 @@
 import { mainnetGraph, testnetGraph } from "@epoch-protocol/epoch-intents-sdk";
 import { getAddress, isAddress } from "viem";
+import { chains as wagmiChains, SUPPORTED_CHAIN_IDS } from "./wagmi";
 
 // Graph shape from epoch-commons-sdk: tokens keyed by symbol, chains keyed by chain name
 type GraphChain = { chainId: number; explorer: string };
@@ -86,16 +87,36 @@ export function getChainsFromGraph(
   chainId: number,
   options?: { excludeCurrentChain?: boolean },
 ): ChainInfo[] {
+  const onTestnet = isTestnetChain(chainId);
   const graph = getGraphForChain(chainId);
   const result: ChainInfo[] = [];
+  const includedChainIds = new Set<number>();
+
   for (const [name, chain] of Object.entries(graph.chains)) {
+    if (!SUPPORTED_CHAIN_IDS.has(chain.chainId)) continue;
+    if (isTestnetChain(chain.chainId) !== onTestnet) continue;
     if (options?.excludeCurrentChain && chain.chainId === chainId) continue;
+    includedChainIds.add(chain.chainId);
     result.push({
       name,
       chainId: chain.chainId,
       explorer: chain.explorer,
     });
   }
+
+  for (const chain of wagmiChains) {
+    if (!SUPPORTED_CHAIN_IDS.has(chain.id)) continue;
+    if ((chain.testnet ?? false) !== onTestnet) continue;
+    if (options?.excludeCurrentChain && chain.id === chainId) continue;
+    if (includedChainIds.has(chain.id)) continue;
+
+    result.push({
+      name: chain.name,
+      chainId: chain.id,
+      explorer: chain.blockExplorers?.default?.url ?? "",
+    });
+  }
+
   return result;
 }
 

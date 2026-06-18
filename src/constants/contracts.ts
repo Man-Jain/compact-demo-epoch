@@ -1,10 +1,25 @@
 import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
-import { arbitrum, base, optimism, polygon, sepolia } from "viem/chains";
+import {
+  arbitrum,
+  base,
+  baseSepolia,
+  optimism,
+  polygon,
+  polygonAmoy,
+  sepolia,
+} from "viem/chains";
 
-// Chain configurations
 export const SUPPORTED_CHAINS = {
   [sepolia.id]: {
     name: "Sepolia",
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
+  },
+  [baseSepolia.id]: {
+    name: "Base Sepolia",
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
+  },
+  [polygonAmoy.id]: {
+    name: "Polygon Amoy",
     compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [polygon.id]: {
@@ -96,21 +111,17 @@ export const ERC20_ABI = [
   },
 ] as const;
 
-// Helper function to get chain configuration
 export function getChainConfig(chainId: number) {
   return SUPPORTED_CHAINS[chainId as keyof typeof SUPPORTED_CHAINS];
 }
 
-// Helper function to check if chain is supported
 export function isSupportedChain(chainId: number): boolean {
   return chainId in SUPPORTED_CHAINS;
 }
 
-// Type for deposit function arguments
 export type NativeDepositArgs = readonly [`0x${string}`];
 export type TokenDepositArgs = readonly [`0x${string}`, `0x${string}`, bigint];
 
-// Type for transfer payload
 export interface BasicTransfer {
   allocatorSignature: `0x${string}`;
   nonce: bigint;

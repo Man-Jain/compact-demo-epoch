@@ -9,13 +9,13 @@ import {
 import { type Hash } from "viem";
 import { isSupportedChain } from "../../src/constants/contracts";
 import { useNotification } from "./useNotification";
-import { sepolia } from "viem/chains";
 import COMPACT_ABI from "../abis/COMPACT_ABI.json";
 import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
+import { chains as wagmiChains } from "../config/wagmi";
 
-const chains: Record<number, any> = {
-  [sepolia.id]: sepolia,
-};
+const chains: Record<number, (typeof wagmiChains)[number]> = Object.fromEntries(
+  wagmiChains.map((chain) => [chain.id, chain]),
+);
 
 interface NativeDeposit {
   allocator: `0x${string}`;
