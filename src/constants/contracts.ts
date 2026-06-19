@@ -4,6 +4,7 @@ import {
   base,
   baseSepolia,
   optimism,
+  optimismSepolia,
   polygon,
   polygonAmoy,
   sepolia,
@@ -16,6 +17,10 @@ export const SUPPORTED_CHAINS = {
   },
   [baseSepolia.id]: {
     name: "Base Sepolia",
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
+  },
+  [optimismSepolia.id]: {
+    name: "Optimism Sepolia",
     compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [polygonAmoy.id]: {

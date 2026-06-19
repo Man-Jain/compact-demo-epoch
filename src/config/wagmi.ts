@@ -2,6 +2,7 @@ import { http } from "wagmi";
 import {
   sepolia,
   baseSepolia,
+  optimismSepolia,
   polygonAmoy,
   polygon,
   arbitrum,
@@ -16,6 +17,7 @@ const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
 export const chains = [
   sepolia,
   baseSepolia,
+  optimismSepolia,
   polygonAmoy,
   polygon,
   arbitrum,
@@ -44,6 +46,7 @@ export const config = getDefaultConfig({
 export const CHAIN_IDS = {
   SEPOLIA: sepolia.id,
   BASE_SEPOLIA: baseSepolia.id,
+  OPTIMISM_SEPOLIA: optimismSepolia.id,
   POLYGON_AMOY: polygonAmoy.id,
   POLYGON: polygon.id,
   ARBITRUM: arbitrum.id,
