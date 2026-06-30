@@ -87,7 +87,7 @@ export default function BalancePage() {
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
   const destinationChains = useMemo(
-    () => getChainsFromGraph(chainId, { excludeCurrentChain: true }),
+    () => getChainsFromGraph(chainId),
     [chainId],
   );
   // Output token options = tokens on the selected destination chain
