@@ -6,7 +6,6 @@ import {
   optimism,
   optimismSepolia,
   polygon,
-  polygonAmoy,
   sepolia,
 } from "viem/chains";
 
@@ -21,10 +20,6 @@ export const SUPPORTED_CHAINS = {
   },
   [optimismSepolia.id]: {
     name: "Optimism Sepolia",
-    compactAddress: COMPACT_ADDRESS as `0x${string}`,
-  },
-  [polygonAmoy.id]: {
-    name: "Polygon Amoy",
     compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [polygon.id]: {
