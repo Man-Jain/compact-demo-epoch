@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  useAccount,
-  useChainId,
-  useWalletClient,
-  useWriteContract,
-  usePublicClient,
-} from "wagmi";
+import { useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { useNotification } from "../hooks/useNotification";
+import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
 import { useTokenOnChain } from "../hooks/useTokenOnChain";
 import { useCompact } from "../hooks/useCompact";
@@ -19,6 +14,11 @@ import CompactsList from "../components/CompactsList";
 import AccountResourceLockBalances from "../components/AccountResourceLockBalances";
 import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
+import { GaslessEnableButton } from "../components/GaslessEnableButton";
+import { useGaslessWallet } from "../hooks/useGaslessWallet";
+import { isInjectedWallet } from "../gasless/wallet-capability";
+import { config as apiConfig } from "../config/api";
+import { useLocalSigner } from "../context/LocalSignerContext";
 import {
   EpochIntentSDK,
   TaskType,
@@ -108,15 +108,22 @@ function isValidCustomSolverInput(value: string): boolean {
 }
 
 export default function BalancePage() {
-  const chainId = useChainId();
-  const { address, isConnected } = useAccount();
+  const {
+    address,
+    isConnected,
+    walletClient,
+    publicClient,
+    chainId,
+    isLocalSigner,
+  } = useEffectiveWallet();
+  const { setChainId: setLocalChainId } = useLocalSigner();
   const { showNotification } = useNotification();
   const { allocatorAddress } = useAllocatorAPI();
   const { supportedChains } = useChainConfig();
   const { isConfirming } = useCompact();
-  const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+
+  const [gasless, setGasless] = useState(false);
 
   const [tokenType, setTokenType] = useState<TokenType>("erc20");
   const [outputTokenAddress, setOutputTokenAddress] = useState("");
@@ -152,6 +159,26 @@ export default function BalancePage() {
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
     [routingPreset, customSolverAddresses],
   );
+
+  const allowGasless = isTestnetChain(chainId);
+  const effectiveAllowGasless = useMemo(
+    () =>
+      allowGasless && walletClient != null && !isInjectedWallet(walletClient),
+    [allowGasless, walletClient],
+  );
+
+  const gaslessWallet = useGaslessWallet({
+    allowGasless: effectiveAllowGasless,
+    apiBaseUrl: apiConfig.apiBaseUrl,
+    gasless,
+    setGasless,
+    walletClient: walletClient ?? undefined,
+    address,
+    chainIdForCheck: chainId,
+    switchChain: isLocalSigner
+      ? ({ chainId: nextChainId }) => setLocalChainId(nextChainId)
+      : undefined,
+  });
 
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
@@ -474,13 +501,14 @@ export default function BalancePage() {
       });
 
       const params: SolveIntentParams = {
-        isNative: false,
+        isNative: tokenType === "native",
         sponsorAddress: address as `0x${string}`,
         taskTypeString,
         intentData,
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
+        gasless: effectiveAllowGasless && gasless,
       };
       const data = await epochSdk.solveIntent(params);
       console.log("data: ", data);
@@ -493,8 +521,9 @@ export default function BalancePage() {
       showNotification({
         type: "success",
         title: "Deposit + Register + Allocation",
-        message:
-          "Deposit submitted, compact registered, and allocation created",
+        message: data?.gaslessUsed
+          ? "Gasless deposit submitted, compact registered, and allocation created"
+          : "Deposit submitted, compact registered, and allocation created",
         chainId,
         autoHide: true,
       });
@@ -563,12 +592,24 @@ export default function BalancePage() {
     try {
       const amount = parseUnits(faucetAmount, selectedToken.decimals);
 
-      const hash = await writeContractAsync({
-        address: faucetToken as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "mint",
-        args: [address, amount],
-      });
+      let hash: `0x${string}`;
+      if (isLocalSigner && walletClient && address) {
+        hash = await walletClient.writeContract({
+          account: address,
+          chain: walletClient.chain,
+          address: faucetToken as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "mint",
+          args: [address, amount],
+        });
+      } else {
+        hash = await writeContractAsync({
+          address: faucetToken as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "mint",
+          args: [address, amount],
+        });
+      }
 
       showNotification({
         type: "success",
@@ -637,10 +678,11 @@ export default function BalancePage() {
         <div className="p-12 bg-[#0a0a0a] rounded-lg border border-gray-800 text-center">
           <div className="max-w-md mx-auto grid">
             <p className="text-gray-300 text-lg mb-2">
-              Please connect your wallet to continue
+              Connect a wallet to continue
             </p>
             <p className="text-gray-500 text-sm">
-              Use the button in the top right corner to connect
+              Use a browser wallet or connect a local signer with a private key
+              (top right) for gasless testing.
             </p>
           </div>
         </div>
@@ -855,6 +897,22 @@ export default function BalancePage() {
                   </p>
                 </div>
               )}
+
+              {effectiveAllowGasless ? (
+                <GaslessEnableButton
+                  gasless={gasless}
+                  disabledReason={gaslessWallet.unavailableReason}
+                  needsEpochSetup={gaslessWallet.needsEpochSetup}
+                  onSwitchSmartAccount={() =>
+                    gaslessWallet.switchToEpochSmartAccount()
+                  }
+                  setupBusy={gaslessWallet.setupBusy}
+                  setupError={gaslessWallet.setupError}
+                  checking={gaslessWallet.checking}
+                  onEnable={() => setGasless(true)}
+                  onDisable={() => setGasless(false)}
+                />
+              ) : null}
 
               <div className="flex gap-3">
                 <button

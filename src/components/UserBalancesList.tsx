@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useChainId, useWalletClient } from "wagmi";
 import type { TokenInfo } from "../config/web3";
 import { WalletWithdrawDialog } from "./WalletWithdrawDialog";
 import { useNotification } from "../hooks/useNotification";
+import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import {
   ALLOCATOR_ADDRESS,
   EpochIntentSDK,
@@ -28,9 +28,7 @@ const WITHDRAW_STATUS_LABEL: Record<ForcedWithdrawalStatus, string> = {
 };
 
 export function UserBalancesList({ tokens }: UserBalancesListProps) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const { data: walletClient } = useWalletClient();
+  const { address, isConnected, walletClient, chainId } = useEffectiveWallet();
   const { showNotification } = useNotification();
 
   const [balanceRows, setBalanceRows] = useState<CompactBalanceRow[]>([]);
