@@ -23,6 +23,7 @@ import {
   EpochIntentSDK,
   TaskType,
   type IntentQuoteResult,
+  type RoutingAndLiquidityOptions,
   type SolveIntentParams,
   type TransactionExecutionStatus,
 } from "@epoch-protocol/epoch-intents-sdk";
@@ -44,6 +45,67 @@ interface IntentTransactionStatus {
 }
 
 type TokenType = "native" | "erc20";
+
+type RoutingPreset = RoutingAndLiquidityOptions["preset"];
+
+const ROUTING_PRESET_OPTIONS: Array<{
+  value: RoutingPreset;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "any",
+    label: "Any (best quote)",
+    description: "Compare all registered solvers",
+  },
+  {
+    value: "filler-single-transaction",
+    label: "Filler — single transaction",
+    description: "Epoch treasury liquidity, one wallet flow",
+  },
+  {
+    value: "external-multi-transactions",
+    label: "External — multi-transaction",
+    description: "External aggregators, multi-step signing",
+  },
+  {
+    value: "custom",
+    label: "Custom solver",
+    description: "Pin a specific solver address",
+  },
+];
+
+function buildRoutingAndLiquidityOptions(
+  preset: RoutingPreset,
+  customSolverAddresses: string,
+): RoutingAndLiquidityOptions {
+  if (preset === "any") {
+    return { preset: "any" };
+  }
+
+  if (preset === "filler-single-transaction") {
+    return { preset: "filler-single-transaction" };
+  }
+
+  if (preset === "external-multi-transactions") {
+    return { preset: "external-multi-transactions" };
+  }
+
+  const solvers = customSolverAddresses
+    .split(/[,\s]+/)
+    .map((address) => address.trim())
+    .filter(Boolean) as `0x${string}`[];
+
+  return { preset: "custom", solvers };
+}
+
+function isValidCustomSolverInput(value: string): boolean {
+  return value
+    .split(/[,\s]+/)
+    .map((address) => address.trim())
+    .filter(Boolean)
+    .every((address) => /^0x[0-9a-fA-F]{40}$/.test(address));
+}
 
 export default function BalancePage() {
   const {
@@ -90,6 +152,13 @@ export default function BalancePage() {
   );
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
+  const [customSolverAddresses, setCustomSolverAddresses] = useState("");
+
+  const routingAndLiquidityOptions = useMemo(
+    () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
+    [routingPreset, customSolverAddresses],
+  );
 
   const allowGasless = isTestnetChain(chainId);
   const effectiveAllowGasless = useMemo(
@@ -258,6 +327,12 @@ export default function BalancePage() {
     if (!walletClient || !address || !allocatorAddress) return false;
     if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
+    if (
+      routingPreset === "custom" &&
+      !isValidCustomSolverInput(customSolverAddresses)
+    ) {
+      return false;
+    }
     if (tokenType === "erc20") {
       if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
         return false;
@@ -282,6 +357,8 @@ export default function BalancePage() {
     isValidDeposit,
     isLoadingDeposit,
     depositDecimals,
+    routingPreset,
+    customSolverAddresses,
   ]);
 
   const fetchIntentQuote = async () => {
@@ -324,6 +401,7 @@ export default function BalancePage() {
         taskTypeString,
         intentData,
         isNative: tokenType === "native",
+        routingAndLiquidityOptions,
       });
 
       setQuoteResult(result);
@@ -347,17 +425,17 @@ export default function BalancePage() {
     }
   };
 
-  // Auto-fetch quote when debounced input amount changes (skip initial mount)
-  const isFirstInputAmountChange = useRef(true);
+  // Auto-fetch quote when debounced input amount or routing options change
+  const isFirstQuoteInputChange = useRef(true);
   useEffect(() => {
-    if (isFirstInputAmountChange.current) {
-      isFirstInputAmountChange.current = false;
+    if (isFirstQuoteInputChange.current) {
+      isFirstQuoteInputChange.current = false;
       return;
     }
     if (!canFetchQuote || isLoadingQuote || isConfirming) return;
     void fetchIntentQuote();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on inputAmount change
-  }, [inputAmount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
+  }, [inputAmount, routingPreset, customSolverAddresses]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
@@ -428,6 +506,7 @@ export default function BalancePage() {
         taskTypeString,
         intentData,
         quoteResult,
+        routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
         gasless: effectiveAllowGasless && gasless,
       };
@@ -707,6 +786,54 @@ export default function BalancePage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Routing & Liquidity
+                </label>
+                <select
+                  value={routingPreset}
+                  onChange={(e) => {
+                    setRoutingPreset(e.target.value as RoutingPreset);
+                    setQuoteResult(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  {ROUTING_PRESET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {
+                    ROUTING_PRESET_OPTIONS.find(
+                      (option) => option.value === routingPreset,
+                    )?.description
+                  }
+                </p>
+              </div>
+
+              {routingPreset === "custom" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Custom Solver Address(es)
+                  </label>
+                  <input
+                    type="text"
+                    value={customSolverAddresses}
+                    onChange={(e) => {
+                      setCustomSolverAddresses(e.target.value);
+                      setQuoteResult(null);
+                    }}
+                    placeholder="0x..."
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00] font-mono text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Separate multiple addresses with commas or spaces.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -759,6 +886,10 @@ export default function BalancePage() {
                       <span className="text-gray-200">
                         {String(quoteResult.resourceLockRequired ?? false)}
                       </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">routing:</span>{" "}
+                      <span className="text-gray-200">{routingPreset}</span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
