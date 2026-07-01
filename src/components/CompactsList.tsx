@@ -6,10 +6,10 @@ import {
   formatAmount,
   formatTimestamp,
 } from "../utils/formatting";
-import { useAccount } from "wagmi";
+import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 
 const CompactsList: React.FC = () => {
-  const { address } = useAccount();
+  const { address } = useEffectiveWallet();
   const { compacts, isLoading, error, refetch } = useCompacts(address ?? "");
 
   if (isLoading) {

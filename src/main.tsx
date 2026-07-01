@@ -8,6 +8,7 @@ import "./index.css";
 import BalancePage from "./pages/BalancePage.tsx";
 import { config } from "./config/wagmi";
 import { NotificationProvider } from "./context/NotificationProvider";
+import { LocalSignerProvider } from "./context/LocalSignerContext";
 import { ChainConfigProvider } from "./contexts/ChainConfigContext";
 import { useChainConfig as useChainConfigQuery } from "./hooks/useChainConfig";
 
@@ -44,15 +45,17 @@ function App() {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={customTheme}>
-          <ChainConfigWrapper>
-            <NotificationProvider>
-              <div className="min-h-screen w-full bg-[#0a0a0a] flex flex-col">
-                <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                  <BalancePage />
+          <LocalSignerProvider>
+            <ChainConfigWrapper>
+              <NotificationProvider>
+                <div className="min-h-screen w-full bg-[#0a0a0a] flex flex-col">
+                  <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    <BalancePage />
+                  </div>
                 </div>
-              </div>
-            </NotificationProvider>
-          </ChainConfigWrapper>
+              </NotificationProvider>
+            </ChainConfigWrapper>
+          </LocalSignerProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

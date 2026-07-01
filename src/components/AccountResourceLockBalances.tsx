@@ -2,12 +2,12 @@ import React, { useState, useMemo } from "react";
 import { useCompacts, CompactRecord } from "../hooks/useCompacts";
 import { formatAddress, formatTimestamp } from "../utils/formatting";
 import { formatUnits } from "viem";
-import { useAccount } from "wagmi";
+import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import { useIntentStatus } from "../hooks/useIntentStatus";
 import { getBlockExplorerTxUrl } from "../utils/chains";
 
 const AccountResourceLockBalances: React.FC = () => {
-  const { address } = useAccount();
+  const { address } = useEffectiveWallet();
   const {
     compacts: databaseCompacts,
     isLoading: compactsLoading,
@@ -138,7 +138,7 @@ const DatabaseCompactCard: React.FC<DatabaseCompactCardProps> = ({
   isExpanded,
   onToggleExpanded,
 }) => {
-  const { address } = useAccount();
+  const { address } = useEffectiveWallet();
   const isExpired =
     new Date(parseInt(compact.compact.expires) * 1000) < new Date();
 
