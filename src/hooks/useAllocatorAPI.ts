@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
+import { useChainId } from "wagmi";
+import { ALLOCATOR_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
 import { getApiUrl } from "../config/api";
 
 interface HealthCheckResponse {
   status: string;
-  allocatorAddress: string;
+  allocatorAddresses: Record<number, string>;
   signingAddress: string;
   timestamp: string;
-  chainConfig: {
+  chainConfig?: {
     defaultFinalizationThresholdSeconds: number;
     supportedChains: Array<{
       chainId: string;
@@ -47,6 +49,7 @@ interface CompactResponse {
 }
 
 export function useAllocatorAPI() {
+  const chainId = useChainId();
   const [allocatorAddress, setAllocatorAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,14 @@ export function useAllocatorAPI() {
           throw new Error("Health check failed");
         }
         const data: HealthCheckResponse = await response.json();
-        setAllocatorAddress(data.allocatorAddress);
+        const resolved =
+          data.allocatorAddresses?.[chainId] ?? ALLOCATOR_ADDRESS[chainId];
+        if (!resolved) {
+          throw new Error(
+            `Allocator address not configured for chain ${chainId}`,
+          );
+        }
+        setAllocatorAddress(resolved);
         setError(null);
       } catch (err) {
         setError(
@@ -74,7 +84,7 @@ export function useAllocatorAPI() {
     };
 
     fetchHealthCheck();
-  }, []);
+  }, [chainId]);
 
   const createAllocation = async (
     sessionToken: string,
