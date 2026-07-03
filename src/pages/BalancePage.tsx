@@ -443,6 +443,8 @@ export default function BalancePage() {
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
+        // Auto-report external (client-submitted) fills to smallocator /reportFill.
+        reportFills: true,
       });
 
       const { taskTypeString, intentData } = await epochSdk.getTaskData({
@@ -508,6 +510,7 @@ export default function BalancePage() {
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
+        onIntentFilled: (fill) => console.log("[onIntentFilled]", fill),
         gasless: effectiveAllowGasless && gasless,
       };
       const data = await epochSdk.solveIntent(params);
