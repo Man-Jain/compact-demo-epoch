@@ -14,7 +14,8 @@ import CompactsList from "../components/CompactsList";
 import AccountResourceLockBalances from "../components/AccountResourceLockBalances";
 import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
-import { GaslessEnableButton } from "../components/GaslessEnableButton";
+import { GaslessCheckbox } from "../components/GaslessCheckbox";
+import { Wallet7702StatusPanel } from "../components/Wallet7702StatusPanel";
 import { useGaslessWallet } from "../hooks/useGaslessWallet";
 import { isInjectedWallet } from "../gasless/wallet-capability";
 import { config as apiConfig } from "../config/api";
@@ -168,7 +169,7 @@ export default function BalancePage() {
   );
 
   const gaslessWallet = useGaslessWallet({
-    allowGasless: effectiveAllowGasless,
+    allowGasless: isTestnetChain(chainId),
     apiBaseUrl: apiConfig.apiBaseUrl,
     gasless,
     setGasless,
@@ -483,6 +484,18 @@ export default function BalancePage() {
         return;
       }
 
+      const useGasless = effectiveAllowGasless && gasless;
+      if (useGasless && gaslessWallet.needsEpochSetup) {
+        showNotification({
+          type: "error",
+          title: "Smart account required",
+          message:
+            "Enable the Epoch smart account below before submitting a gasless deposit.",
+          chainId,
+        });
+        return;
+      }
+
       const reportExecutionStatus = (status: TransactionExecutionStatus) => {
         const notification = getExecutionStatusNotification(status);
         if (notification) {
@@ -508,7 +521,8 @@ export default function BalancePage() {
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
-        gasless: effectiveAllowGasless && gasless,
+        allowGaslessSmartAccount: useGasless,
+        gasless: useGasless,
       };
       const data = await epochSdk.solveIntent(params);
       console.log("data: ", data);
@@ -688,6 +702,23 @@ export default function BalancePage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <Wallet7702StatusPanel
+            address={address}
+            chainId={chainId}
+            chainName={info.chainName}
+            accountType={gaslessWallet.accountType}
+            delegation={gaslessWallet.delegation}
+            delegateAddress={gaslessWallet.delegateAddress}
+            is7702Capable={gaslessWallet.is7702Capable}
+            needsEpochSetup={gaslessWallet.needsEpochSetup}
+            canRelayEnable={gaslessWallet.canRelayEnable}
+            canRelayDeposit={gaslessWallet.canRelayDeposit}
+            chainSupportsGasless={gaslessWallet.chainSupportsGasless}
+            gaslessSelected={gasless}
+            checking={gaslessWallet.checking}
+            onRefresh={() => void gaslessWallet.refresh()}
+          />
+
           {/* Top Row: Deposit Form and Your Compacts side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Deposit Form */}
@@ -899,8 +930,9 @@ export default function BalancePage() {
               )}
 
               {effectiveAllowGasless ? (
-                <GaslessEnableButton
-                  gasless={gasless}
+                <GaslessCheckbox
+                  checked={gasless}
+                  onChange={setGasless}
                   disabledReason={gaslessWallet.unavailableReason}
                   needsEpochSetup={gaslessWallet.needsEpochSetup}
                   onSwitchSmartAccount={() =>
@@ -909,8 +941,6 @@ export default function BalancePage() {
                   setupBusy={gaslessWallet.setupBusy}
                   setupError={gaslessWallet.setupError}
                   checking={gaslessWallet.checking}
-                  onEnable={() => setGasless(true)}
-                  onDisable={() => setGasless(false)}
                 />
               ) : null}
 

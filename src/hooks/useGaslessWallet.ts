@@ -5,7 +5,9 @@ import {
   getWalletGaslessStatus,
   GASLESS_SUPPORTED_CHAIN_IDS,
   isInjectedWallet,
+  detectWalletAccountType,
   type DelegationState,
+  type WalletAccountType,
 } from "../gasless/wallet-capability";
 import { getRpcUrlForChain } from "../config/rpc";
 
@@ -23,12 +25,18 @@ interface UseGaslessWalletParams {
 export type UseGaslessWalletResult = {
   unavailableReason: string | null;
   delegation: DelegationState | null;
+  delegateAddress: `0x${string}` | undefined;
+  accountType: WalletAccountType | null;
   needsEpochSetup: boolean;
   is7702Capable: boolean;
+  canRelayEnable: boolean;
+  canRelayDeposit: boolean;
+  chainSupportsGasless: boolean;
   checking: boolean;
   setupBusy: boolean;
   setupError: string | null;
   switchToEpochSmartAccount: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 export function useGaslessWallet({
@@ -45,26 +53,82 @@ export function useGaslessWallet({
     null,
   );
   const [delegation, setDelegation] = useState<DelegationState | null>(null);
+  const [delegateAddress, setDelegateAddress] = useState<
+    `0x${string}` | undefined
+  >();
+  const [accountType, setAccountType] = useState<WalletAccountType | null>(
+    null,
+  );
   const [needsEpochSetup, setNeedsEpochSetup] = useState(false);
   const [is7702Capable, setIs7702Capable] = useState(false);
+  const [canRelayEnable, setCanRelayEnable] = useState(false);
+  const [canRelayDeposit, setCanRelayDeposit] = useState(false);
+  const [chainSupportsGasless, setChainSupportsGasless] = useState(false);
   const [checking, setChecking] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const probe = useCallback(async () => {
-    if (!allowGasless || !walletClient || !address || chainIdForCheck == null) {
+    if (!walletClient || !address || chainIdForCheck == null) {
       setUnavailableReason(null);
       setDelegation(null);
+      setDelegateAddress(undefined);
+      setAccountType(null);
       setNeedsEpochSetup(false);
       setIs7702Capable(false);
+      setCanRelayEnable(false);
+      setCanRelayDeposit(false);
+      setChainSupportsGasless(false);
       return;
     }
 
-    if (isInjectedWallet(walletClient)) {
-      setUnavailableReason(null);
-      setDelegation(null);
-      setNeedsEpochSetup(false);
-      setIs7702Capable(false);
+    const walletType = detectWalletAccountType(walletClient);
+    setAccountType(walletType);
+    setChainSupportsGasless(
+      GASLESS_SUPPORTED_CHAIN_IDS.includes(chainIdForCheck),
+    );
+
+    if (!allowGasless || isInjectedWallet(walletClient)) {
+      setChecking(true);
+      try {
+        const rpcUrl =
+          getRpcUrlForChain(chainIdForCheck) ??
+          walletClient.chain?.rpcUrls?.default?.http?.[0] ??
+          "";
+
+        const publicClient = createPublicClient({
+          transport: http(rpcUrl),
+        });
+
+        const status = await getWalletGaslessStatus({
+          publicClient,
+          walletClient,
+          chainId: chainIdForCheck,
+          user: address as `0x${string}`,
+        });
+
+        setDelegation(status.delegation);
+        setDelegateAddress(status.delegateAddress);
+        setNeedsEpochSetup(false);
+        setIs7702Capable(false);
+        setCanRelayEnable(false);
+        setCanRelayDeposit(false);
+        setUnavailableReason(
+          walletType === "json-rpc"
+            ? "Browser wallet — standard deposits only (use local signer for gasless)"
+            : null,
+        );
+      } catch {
+        setDelegation(null);
+        setDelegateAddress(undefined);
+        setNeedsEpochSetup(false);
+        setIs7702Capable(false);
+        setCanRelayEnable(false);
+        setCanRelayDeposit(false);
+        setUnavailableReason(null);
+      } finally {
+        setChecking(false);
+      }
       return;
     }
 
@@ -87,8 +151,11 @@ export function useGaslessWallet({
       });
 
       setDelegation(status.delegation);
+      setDelegateAddress(status.delegateAddress);
       setIs7702Capable(status.is7702Capable);
       setNeedsEpochSetup(status.needsSetup);
+      setCanRelayEnable(status.canRelayEnable);
+      setCanRelayDeposit(status.canRelayDeposit);
 
       if (status.delegation === "other") {
         setUnavailableReason(
@@ -106,8 +173,11 @@ export function useGaslessWallet({
     } catch {
       setUnavailableReason(null);
       setDelegation(null);
+      setDelegateAddress(undefined);
       setNeedsEpochSetup(false);
       setIs7702Capable(false);
+      setCanRelayEnable(false);
+      setCanRelayDeposit(false);
     } finally {
       setChecking(false);
     }
@@ -187,11 +257,17 @@ export function useGaslessWallet({
   return {
     unavailableReason,
     delegation,
+    delegateAddress,
+    accountType,
     needsEpochSetup,
     is7702Capable,
+    canRelayEnable,
+    canRelayDeposit,
+    chainSupportsGasless,
     checking,
     setupBusy,
     setupError,
     switchToEpochSmartAccount,
+    refresh: probe,
   };
 }
