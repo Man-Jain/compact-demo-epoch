@@ -6,9 +6,10 @@ import {
   optimism,
   optimismSepolia,
   polygon,
+  robinhood,
+  robinhoodTestnet,
   sepolia,
 } from "viem/chains";
-import { robinhood, robinhoodTestnet } from "../config/robinhood";
 
 export const SUPPORTED_CHAINS = {
   [sepolia.id]: {
