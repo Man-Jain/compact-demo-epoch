@@ -13,15 +13,12 @@ type EpochGraph = {
   tokens: GraphTokens;
 };
 
-const MAINNET_CHAIN_IDS = new Set([
-  8453, // Base
-  10, // Optimism
-  137, // Polygon
-  42161, // Arbitrum
-]);
+function graphHasChain(graph: EpochGraph, chainId: number): boolean {
+  return Object.values(graph.chains).some((chain) => chain.chainId === chainId);
+}
 
 function getGraphForChain(chainId: number): EpochGraph {
-  return MAINNET_CHAIN_IDS.has(chainId)
+  return graphHasChain(mainnetGraph as EpochGraph, chainId)
     ? (mainnetGraph as EpochGraph)
     : (testnetGraph as EpochGraph);
 }
@@ -123,8 +120,8 @@ export function getChainsFromGraph(
 export { mainnetGraph, testnetGraph };
 
 /**
- * Check if a chain is a testnet (not in the mainnet chain IDs list).
+ * Check if a chain is absent from the mainnet graph.
  */
 export function isTestnetChain(chainId: number): boolean {
-  return !MAINNET_CHAIN_IDS.has(chainId);
+  return !graphHasChain(mainnetGraph as EpochGraph, chainId);
 }
