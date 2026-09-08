@@ -10,6 +10,7 @@ import {
 } from "viem/chains";
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { getRpcUrlForChain } from "./rpc";
+import { robinhood, robinhoodTestnet } from "./robinhood";
 
 const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
 
@@ -21,6 +22,8 @@ export const chains = [
   arbitrum,
   base,
   optimism,
+  robinhood,
+  robinhoodTestnet,
 ] as const;
 
 export const SUPPORTED_CHAIN_IDS = new Set<number>(
@@ -49,4 +52,6 @@ export const CHAIN_IDS = {
   ARBITRUM: arbitrum.id,
   BASE: base.id,
   OPTIMISM: optimism.id,
+  ROBINHOOD: robinhood.id,
+  ROBINHOOD_TESTNET: robinhoodTestnet.id,
 } as const;

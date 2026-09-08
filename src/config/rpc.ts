@@ -16,9 +16,11 @@ export const RPC_ENDPOINTS: Record<number, string> = {
   137: `https://rpc.ankr.com/polygon/${ANKR_API_KEY}`,
   8453: `https://rpc.ankr.com/base/${ANKR_API_KEY}`,
   42161: `https://rpc.ankr.com/arbitrum/${ANKR_API_KEY}`,
+  4663: "https://rpc.mainnet.chain.robinhood.com",
   84532: `https://rpc.ankr.com/base_sepolia/${ANKR_API_KEY}`,
   11155420: `https://rpc.ankr.com/optimism_sepolia/${ANKR_API_KEY}`,
   11155111: `https://rpc.ankr.com/eth_sepolia/${ANKR_API_KEY}`,
+  46630: "https://rpc.testnet.chain.robinhood.com",
 };
 
 const VIEM_CHAIN_RPCS = [
