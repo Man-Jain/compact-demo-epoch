@@ -11,15 +11,24 @@ import {
 /** RPC URLs for supported chains (including chains not in wagmi config). */
 const ANKR_API_KEY = import.meta.env.VITE_ANKR_API_KEY;
 
+function ankrRpc(network: string, fallback: string): string {
+  return ANKR_API_KEY
+    ? `https://rpc.ankr.com/${network}/${ANKR_API_KEY}`
+    : fallback;
+}
+
 export const RPC_ENDPOINTS: Record<number, string> = {
-  10: `https://rpc.ankr.com/optimism/${ANKR_API_KEY}`,
-  137: `https://rpc.ankr.com/polygon/${ANKR_API_KEY}`,
-  8453: `https://rpc.ankr.com/base/${ANKR_API_KEY}`,
-  42161: `https://rpc.ankr.com/arbitrum/${ANKR_API_KEY}`,
+  10: ankrRpc("optimism", optimism.rpcUrls.default.http[0]),
+  137: ankrRpc("polygon", polygon.rpcUrls.default.http[0]),
+  8453: ankrRpc("base", base.rpcUrls.default.http[0]),
+  42161: ankrRpc("arbitrum", arbitrum.rpcUrls.default.http[0]),
   4663: "https://rpc.mainnet.chain.robinhood.com",
-  84532: `https://rpc.ankr.com/base_sepolia/${ANKR_API_KEY}`,
-  11155420: `https://rpc.ankr.com/optimism_sepolia/${ANKR_API_KEY}`,
-  11155111: `https://rpc.ankr.com/eth_sepolia/${ANKR_API_KEY}`,
+  84532: ankrRpc("base_sepolia", baseSepolia.rpcUrls.default.http[0]),
+  11155420: ankrRpc(
+    "optimism_sepolia",
+    optimismSepolia.rpcUrls.default.http[0],
+  ),
+  11155111: ankrRpc("eth_sepolia", sepolia.rpcUrls.default.http[0]),
   46630: "https://rpc.testnet.chain.robinhood.com",
 };
 

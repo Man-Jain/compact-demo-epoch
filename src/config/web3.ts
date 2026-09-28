@@ -1,4 +1,4 @@
-import { mainnetGraph, testnetGraph } from "@epoch-protocol/epoch-intents-sdk";
+import { mainnetGraph, testnetGraph } from "@epoch-protocol/epoch-commons-sdk";
 import { getAddress, isAddress } from "viem";
 import { chains as wagmiChains, SUPPORTED_CHAIN_IDS } from "./wagmi";
 
