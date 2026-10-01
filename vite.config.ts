@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: {
+      // Keep the app and intents SDK on one commons-SDK instance so newly
+      // added testnet chain configuration is not shadowed by a nested copy.
+      dedupe: ["@epoch-protocol/epoch-commons-sdk"],
+    },
     server: {
       port: parseInt(devPort),
       strictPort: false, // Try next available port if port is in use

@@ -3,10 +3,8 @@ import type { TokenInfo } from "../config/web3";
 import { WalletWithdrawDialog } from "./WalletWithdrawDialog";
 import { useNotification } from "../hooks/useNotification";
 import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
-import {
-  ALLOCATOR_ADDRESS,
-  EpochIntentSDK,
-} from "@epoch-protocol/epoch-intents-sdk";
+import { ALLOCATOR_ADDRESS } from "@epoch-protocol/epoch-commons-sdk";
+import { EpochIntentSDK } from "@epoch-protocol/epoch-intents-sdk";
 import type { ForcedWithdrawalStatus } from "./WalletWithdrawDialog";
 
 interface UserBalancesListProps {
@@ -30,12 +28,19 @@ const WITHDRAW_STATUS_LABEL: Record<ForcedWithdrawalStatus, string> = {
 export function UserBalancesList({ tokens }: UserBalancesListProps) {
   const { address, isConnected, walletClient, chainId } = useEffectiveWallet();
   const { showNotification } = useNotification();
+  const allocatorAddress = ALLOCATOR_ADDRESS[chainId];
 
   const [balanceRows, setBalanceRows] = useState<CompactBalanceRow[]>([]);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
   const loadBalances = useCallback(async () => {
-    if (!isConnected || !address || !walletClient || tokens.length === 0) {
+    if (
+      !isConnected ||
+      !address ||
+      !walletClient ||
+      !allocatorAddress ||
+      tokens.length === 0
+    ) {
       setBalanceRows([]);
       return;
     }
@@ -68,7 +73,15 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
     } finally {
       setIsLoadingBalances(false);
     }
-  }, [address, chainId, isConnected, showNotification, tokens, walletClient]);
+  }, [
+    address,
+    allocatorAddress,
+    chainId,
+    isConnected,
+    showNotification,
+    tokens,
+    walletClient,
+  ]);
 
   useEffect(() => {
     void loadBalances();
@@ -136,11 +149,20 @@ export function UserBalancesList({ tokens }: UserBalancesListProps) {
       <p className="text-sm text-gray-400">
         Balances from The Compact (balanceOf). Token IDs from allocator{" "}
         <code className="text-gray-500">
-          {ALLOCATOR_ADDRESS[chainId].toString().slice(0, 10)}…
+          {allocatorAddress
+            ? `${allocatorAddress.slice(0, 10)}…`
+            : "not configured"}
         </code>{" "}
         and SDK helpers (createLockTag, getTokenId, getAllocatorId). Withdraw
         via SDK.
       </p>
+
+      {!allocatorAddress ? (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          An allocator is not configured for chain {chainId}, so Compact
+          balances and withdrawals are unavailable on this network.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border border-gray-700 overflow-hidden">
         <table className="w-full text-left text-sm">

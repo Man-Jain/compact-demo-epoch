@@ -6,6 +6,8 @@ import {
   optimism,
   optimismSepolia,
   polygon,
+  robinhood,
+  robinhoodTestnet,
   sepolia,
 } from "viem/chains";
 
@@ -36,6 +38,14 @@ export const SUPPORTED_CHAINS = {
   },
   [optimism.id]: {
     name: "Optimism",
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
+  },
+  [robinhood.id]: {
+    name: "Robinhood Chain",
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
+  },
+  [robinhoodTestnet.id]: {
+    name: "Robinhood Chain Testnet",
     compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
 } as const;

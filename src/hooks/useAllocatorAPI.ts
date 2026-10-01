@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useChainId } from "wagmi";
-import { ALLOCATOR_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
+import { ALLOCATOR_ADDRESS } from "@epoch-protocol/epoch-commons-sdk";
 import { getApiUrl } from "../config/api";
 
 interface HealthCheckResponse {
