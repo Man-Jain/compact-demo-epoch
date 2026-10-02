@@ -12,6 +12,9 @@ import {
 const ANKR_API_KEY = import.meta.env.VITE_ANKR_API_KEY;
 
 export const RPC_ENDPOINTS: Record<number, string> = {
+  4663: "https://rpc.mainnet.chain.robinhood.com",
+  46630: "https://rpc.testnet.chain.robinhood.com",
+  1: `https://rpc.ankr.com/eth/${ANKR_API_KEY ?? ""}`,
   10: `https://rpc.ankr.com/optimism/${ANKR_API_KEY}`,
   137: `https://rpc.ankr.com/polygon/${ANKR_API_KEY}`,
   8453: `https://rpc.ankr.com/base/${ANKR_API_KEY}`,

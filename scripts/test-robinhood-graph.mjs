@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+
+const source = readFileSync(new URL("../src/config/robinhood-graph.ts", import.meta.url), "utf8");
+const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
+const { withRobinhoodGraph } = await import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+const graph = { chains: { Ethereum: { chainId: 1, explorer: "https://etherscan.io" } }, tokens: {} };
+const mainnet = withRobinhoodGraph(graph, false);
+assert.equal(mainnet.chains.Ethereum.chainId, 1);
+assert.equal(mainnet.chains.Robinhood.chainId, 4663);
+assert.equal(mainnet.tokens.WETH.decimals, 18);
+assert.equal(mainnet.tokens.USDG.decimals, 6);
+assert.ok(mainnet.tokens.USDe.contractAddress.Robinhood);
+assert.equal(withRobinhoodGraph(mainnet, false), mainnet);
+assert.equal(graph.chains.Robinhood, undefined);
+assert.deepEqual(graph.tokens, {});
+const testnet = withRobinhoodGraph({ chains: {}, tokens: {} }, true);
+assert.equal(testnet.chains.Robinhood.chainId, 46630);
+assert.equal(testnet.tokens.USDC.decimals, 18);
+assert.ok(testnet.tokens.USDC.contractAddress.Robinhood);
+console.log("Ethereum and Robinhood graph fallback checks passed");
