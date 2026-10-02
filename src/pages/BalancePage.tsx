@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
+import { parseUnits, zeroAddress } from "viem";
 import { useNotification } from "../hooks/useNotification";
 import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
@@ -185,6 +185,10 @@ export default function BalancePage() {
 
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
+  const erc20Tokens = useMemo(
+    () => graphTokens.filter((token) => token.address.toLowerCase() !== zeroAddress),
+    [graphTokens],
+  );
   const destinationChains = useMemo(
     () => getChainsFromGraph(chainId),
     [chainId],
@@ -197,7 +201,9 @@ export default function BalancePage() {
     if (!destinationChainId) return [];
     const id = parseInt(destinationChainId, 10);
     if (Number.isNaN(id)) return [];
-    return getTokensForChain(id);
+    return getTokensForChain(id).filter(
+      (token) => token.address.toLowerCase() !== zeroAddress,
+    );
   }, [destinationChainId]);
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
@@ -206,10 +212,10 @@ export default function BalancePage() {
   useEffect(() => {
     if (prevSourceChainRef.current === chainId) return;
     prevSourceChainRef.current = chainId;
-    if (graphTokens.length === 0) return;
-    setDepositTokenAddress(graphTokens[0].address);
-    setFaucetToken(graphTokens[0].address);
-  }, [chainId, graphTokens]);
+    if (erc20Tokens.length === 0) return;
+    setDepositTokenAddress(erc20Tokens[0].address);
+    setFaucetToken(erc20Tokens[0].address);
+  }, [chainId, erc20Tokens]);
 
   useEffect(() => {
     if (prevDestinationChainRef.current === destinationChainId) return;
@@ -804,7 +810,7 @@ export default function BalancePage() {
                     setDepositTokenAddress(value);
                     setQuoteResult(null);
                   }}
-                  suggestions={graphTokens}
+                  suggestions={erc20Tokens}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
                   balance={depositBalance}
@@ -1057,7 +1063,7 @@ export default function BalancePage() {
                     onChange={(e) => setFaucetToken(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   >
-                    {graphTokens.map((token) => (
+                    {erc20Tokens.map((token) => (
                       <option key={token.address} value={token.address}>
                         {token.symbol}
                       </option>

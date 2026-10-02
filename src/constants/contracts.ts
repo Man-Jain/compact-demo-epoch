@@ -1,4 +1,4 @@
-import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
+import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-commons-sdk";
 import {
   mainnet,
   arbitrum,
@@ -15,7 +15,7 @@ import {
 export const SUPPORTED_CHAINS = {
   [mainnet.id]: {
     name: "Ethereum",
-    compactAddress: COMPACT_ADDRESS[mainnet.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [sepolia.id]: {
     name: "Sepolia",

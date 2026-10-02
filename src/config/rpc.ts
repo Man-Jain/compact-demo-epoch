@@ -1,4 +1,5 @@
 import {
+  mainnet,
   arbitrum,
   base,
   baseSepolia,
@@ -18,6 +19,7 @@ function ankrRpc(network: string, fallback: string): string {
 }
 
 export const RPC_ENDPOINTS: Record<number, string> = {
+  1: ankrRpc("eth", mainnet.rpcUrls.default.http[0]),
   10: ankrRpc("optimism", optimism.rpcUrls.default.http[0]),
   137: ankrRpc("polygon", polygon.rpcUrls.default.http[0]),
   8453: ankrRpc("base", base.rpcUrls.default.http[0]),
