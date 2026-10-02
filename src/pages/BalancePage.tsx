@@ -32,12 +32,20 @@ import {
   EXECUTION_STATUS_NOTIFICATION_ID,
   getExecutionStatusNotification,
 } from "../utils/executionStatusNotifications";
+import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
   getChainsFromGraph,
   isTestnetChain,
 } from "../config/web3";
+import {
+  buildDexRouteExtraData,
+  DEX_ROUTE_OPTIONS,
+  DUMMY_LENDING_TOKENS,
+  getDexTestTokens,
+  type DexRouteId,
+} from "../config/dex-pools";
 
 interface IntentTransactionStatus {
   status: string;
@@ -155,6 +163,7 @@ export default function BalancePage() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
+  const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
 
   const routingAndLiquidityOptions = useMemo(
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
@@ -187,6 +196,9 @@ export default function BalancePage() {
     () => getChainsFromGraph(chainId),
     [chainId],
   );
+  const destinationChainIdNumber = destinationChainId
+    ? parseInt(destinationChainId, 10)
+    : undefined;
   // Output token options = tokens on the selected destination chain
   const outputTokenOptions = useMemo(() => {
     if (!destinationChainId) return [];
@@ -194,6 +206,19 @@ export default function BalancePage() {
     if (Number.isNaN(id)) return [];
     return getTokensForChain(id);
   }, [destinationChainId]);
+  const inputTokenSuggestions = useMemo(
+    () => [...graphTokens, ...getDexTestTokens(chainId)],
+    [chainId, graphTokens],
+  );
+  const outputTokenSuggestions = useMemo(
+    () => [
+      ...outputTokenOptions,
+      ...(destinationChainIdNumber
+        ? getDexTestTokens(destinationChainIdNumber)
+        : []),
+    ],
+    [destinationChainIdNumber, outputTokenOptions],
+  );
 
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
@@ -210,9 +235,16 @@ export default function BalancePage() {
   useEffect(() => {
     if (prevDestinationChainRef.current === destinationChainId) return;
     prevDestinationChainRef.current = destinationChainId;
+    if (
+      dexRoute === "base-sepolia-hooked-v4" &&
+      destinationChainId === "84532"
+    ) {
+      setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
+      return;
+    }
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
-  }, [destinationChainId, outputTokenOptions]);
+  }, [destinationChainId, dexRoute, outputTokenOptions]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
@@ -224,9 +256,14 @@ export default function BalancePage() {
     }
   }, [chainId, destinationChains]);
 
-  const destinationChainIdNumber = destinationChainId
-    ? parseInt(destinationChainId, 10)
-    : undefined;
+  // Keep the reusable hooked-pool fixture on its signed pair after route
+  // selection and after Vite hot reload restores existing form state.
+  useEffect(() => {
+    if (dexRoute !== "base-sepolia-hooked-v4") return;
+    setDestinationChainId("84532");
+    setDepositTokenAddress(DUMMY_LENDING_TOKENS[0]!.address);
+    setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
+  }, [dexRoute]);
 
   const {
     isValid: isValidDeposit,
@@ -367,6 +404,12 @@ export default function BalancePage() {
     setIsLoadingQuote(true);
     setQuoteResult(null);
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: dexRoute,
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: depositChecksumAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
@@ -391,10 +434,7 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
       });
 
       const result = await epochSdk.getIntentQuote({
@@ -436,11 +476,17 @@ export default function BalancePage() {
     if (!canFetchQuote || isLoadingQuote || isConfirming) return;
     void fetchIntentQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
-  }, [inputAmount, routingPreset, customSolverAddresses]);
+  }, [inputAmount, routingPreset, customSolverAddresses, dexRoute]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: dexRoute,
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: depositChecksumAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
@@ -465,10 +511,7 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
       });
 
       console.log("taskTypeString: ", taskTypeString);
@@ -533,13 +576,10 @@ export default function BalancePage() {
       }
 
       showNotification({
-        type: "success",
-        title: "Deposit + Register + Allocation",
-        message: data?.gaslessUsed
-          ? "Gasless deposit submitted, compact registered, and allocation created"
-          : "Deposit submitted, compact registered, and allocation created",
+        ...createSolveCompletionNotification({
+          gaslessUsed: data?.gaslessUsed,
+        }),
         chainId,
-        autoHide: true,
       });
     } catch (error) {
       showNotification({
@@ -771,7 +811,7 @@ export default function BalancePage() {
                   label="Output Token Address (destination chain)"
                   value={outputTokenAddress}
                   onChange={setOutputTokenAddress}
-                  suggestions={outputTokenOptions}
+                  suggestions={outputTokenSuggestions}
                   symbol={outputSymbol}
                   decimals={outputDecimals}
                   isLoading={isLoadingOutput}
@@ -786,7 +826,7 @@ export default function BalancePage() {
                   label="Input Token Address (source chain)"
                   value={depositTokenAddress}
                   onChange={setDepositTokenAddress}
-                  suggestions={graphTokens}
+                  suggestions={inputTokenSuggestions}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
                   balance={depositBalance}
@@ -862,6 +902,50 @@ export default function BalancePage() {
                   <p className="mt-1 text-xs text-gray-500">
                     Separate multiple addresses with commas or spaces.
                   </p>
+                </div>
+              )}
+
+              {tokenType === "erc20" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    DEX Pool Route
+                  </label>
+                  <select
+                    value={dexRoute}
+                    onChange={(event) => {
+                      const nextRoute = event.target.value as DexRouteId;
+                      setDexRoute(nextRoute);
+                      if (nextRoute === "base-sepolia-hooked-v4") {
+                        setDestinationChainId("84532");
+                        setDepositTokenAddress(
+                          DUMMY_LENDING_TOKENS[0]!.address,
+                        );
+                        setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
+                      }
+                      setQuoteResult(null);
+                    }}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                  >
+                    {DEX_ROUTE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {
+                      DEX_ROUTE_OPTIONS.find((option) => option.id === dexRoute)
+                        ?.description
+                    }
+                  </p>
+                  {dexRoute === "base-sepolia-hooked-v4" && (
+                    <p className="mt-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-xs leading-relaxed text-gray-300">
+                      Cross-chain fixture: switch your source wallet to Sepolia
+                      (11155111), then keep Base Sepolia (84532) as the
+                      destination. This route automatically selects Test USDC
+                      input and Test USDT output.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -961,6 +1045,13 @@ export default function BalancePage() {
                   {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
                 </button>
               </div>
+              {!canFetchQuote && (
+                <p className="text-xs text-yellow-400">
+                  Get Quote activates after a wallet is connected, the allocator
+                  is available, and both ERC-20 token addresses have resolved on
+                  their selected chains.
+                </p>
+              )}
             </div>
             <div>
               <AccountResourceLockBalances />

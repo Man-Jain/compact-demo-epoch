@@ -1,8 +1,10 @@
 import type { TransactionExecutionStatus } from "@epoch-protocol/epoch-intents-sdk";
 import { getChainName } from "./chains";
+import { EXECUTION_STATUS_NOTIFICATION_ID } from "./solveCompletionNotification";
+
+export { EXECUTION_STATUS_NOTIFICATION_ID } from "./solveCompletionNotification";
 
 /** Stable id so in-progress execution alerts replace each other */
-export const EXECUTION_STATUS_NOTIFICATION_ID = "pending-solve-intent";
 
 type ExecutionNotification = {
   type: "success" | "error" | "warning" | "info";
