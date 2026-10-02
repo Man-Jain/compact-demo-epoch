@@ -1,4 +1,4 @@
-import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-intents-sdk";
+import { COMPACT_ADDRESS } from "@epoch-protocol/epoch-commons-sdk";
 import {
   mainnet,
   arbitrum,
@@ -12,51 +12,46 @@ import {
   sepolia,
 } from "viem/chains";
 
-// Retain the canonical Compact deployment placeholder for Robinhood until
-// its deployment is included in the published Epoch SDK.
-const ROBINHOOD_COMPACT_ADDRESS =
-  "0x00000000000000171ede64904551eeDF3C6C9788" as const;
-
 export const SUPPORTED_CHAINS = {
   [mainnet.id]: {
     name: "Ethereum",
-    compactAddress: COMPACT_ADDRESS[mainnet.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [sepolia.id]: {
     name: "Sepolia",
-    compactAddress: COMPACT_ADDRESS[sepolia.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [baseSepolia.id]: {
     name: "Base Sepolia",
-    compactAddress: COMPACT_ADDRESS[baseSepolia.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [optimismSepolia.id]: {
     name: "Optimism Sepolia",
-    compactAddress: COMPACT_ADDRESS[optimismSepolia.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [polygon.id]: {
     name: "Polygon",
-    compactAddress: COMPACT_ADDRESS[polygon.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [arbitrum.id]: {
     name: "Arbitrum",
-    compactAddress: COMPACT_ADDRESS[arbitrum.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [base.id]: {
     name: "Base",
-    compactAddress: COMPACT_ADDRESS[base.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [optimism.id]: {
     name: "Optimism",
-    compactAddress: COMPACT_ADDRESS[optimism.id] as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [robinhood.id]: {
     name: "Robinhood Chain",
-    compactAddress: (COMPACT_ADDRESS[robinhood.id] ?? ROBINHOOD_COMPACT_ADDRESS) as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
   [robinhoodTestnet.id]: {
     name: "Robinhood Chain Testnet",
-    compactAddress: (COMPACT_ADDRESS[robinhoodTestnet.id] ?? ROBINHOOD_COMPACT_ADDRESS) as `0x${string}`,
+    compactAddress: COMPACT_ADDRESS as `0x${string}`,
   },
 } as const;
 
