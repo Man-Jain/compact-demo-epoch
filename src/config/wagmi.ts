@@ -1,6 +1,8 @@
 import { http } from "wagmi";
 import {
   mainnet,
+  robinhood,
+  robinhoodTestnet,
   sepolia,
   baseSepolia,
   optimismSepolia,
@@ -8,8 +10,6 @@ import {
   arbitrum,
   base,
   optimism,
-  robinhood,
-  robinhoodTestnet,
 } from "viem/chains";
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { getRpcUrlForChain } from "./rpc";
@@ -18,6 +18,8 @@ const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
 
 export const chains = [
   mainnet,
+  robinhood,
+  robinhoodTestnet,
   sepolia,
   baseSepolia,
   optimismSepolia,
@@ -25,8 +27,6 @@ export const chains = [
   arbitrum,
   base,
   optimism,
-  robinhood,
-  robinhoodTestnet,
 ] as const;
 
 export const SUPPORTED_CHAIN_IDS = new Set<number>(
@@ -49,6 +49,8 @@ export const config = getDefaultConfig({
 
 export const CHAIN_IDS = {
   MAINNET: mainnet.id,
+  ROBINHOOD: robinhood.id,
+  ROBINHOOD_TESTNET: robinhoodTestnet.id,
   SEPOLIA: sepolia.id,
   BASE_SEPOLIA: baseSepolia.id,
   OPTIMISM_SEPOLIA: optimismSepolia.id,
@@ -56,6 +58,4 @@ export const CHAIN_IDS = {
   ARBITRUM: arbitrum.id,
   BASE: base.id,
   OPTIMISM: optimism.id,
-  ROBINHOOD: robinhood.id,
-  ROBINHOOD_TESTNET: robinhoodTestnet.id,
 } as const;
