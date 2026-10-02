@@ -39,13 +39,7 @@ import {
   getChainsFromGraph,
   isTestnetChain,
 } from "../config/web3";
-import {
-  buildDexRouteExtraData,
-  DEX_ROUTE_OPTIONS,
-  getDexRouteTestConfig,
-  getDexTestTokens,
-  type DexRouteId,
-} from "../config/dex-pools";
+import { buildDexRouteExtraData } from "../config/dex-pools";
 
 interface IntentTransactionStatus {
   status: string;
@@ -163,11 +157,6 @@ export default function BalancePage() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
-  const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
-  const dexRouteTestConfig = useMemo(
-    () => getDexRouteTestConfig(dexRoute),
-    [dexRoute],
-  );
 
   const routingAndLiquidityOptions = useMemo(
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
@@ -210,20 +199,6 @@ export default function BalancePage() {
     if (Number.isNaN(id)) return [];
     return getTokensForChain(id);
   }, [destinationChainId]);
-  const inputTokenSuggestions = useMemo(
-    () => [...graphTokens, ...getDexTestTokens(chainId)],
-    [chainId, graphTokens],
-  );
-  const outputTokenSuggestions = useMemo(
-    () => [
-      ...outputTokenOptions,
-      ...(destinationChainIdNumber
-        ? getDexTestTokens(destinationChainIdNumber)
-        : []),
-    ],
-    [destinationChainIdNumber, outputTokenOptions],
-  );
-
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
 
@@ -239,16 +214,9 @@ export default function BalancePage() {
   useEffect(() => {
     if (prevDestinationChainRef.current === destinationChainId) return;
     prevDestinationChainRef.current = destinationChainId;
-    if (
-      dexRouteTestConfig &&
-      destinationChainId === dexRouteTestConfig.destinationChainId.toString()
-    ) {
-      setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
-      return;
-    }
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
-  }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
+  }, [destinationChainId, outputTokenOptions]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
@@ -259,15 +227,6 @@ export default function BalancePage() {
       setDestinationChainId(destinationChains[0].chainId.toString());
     }
   }, [chainId, destinationChains]);
-
-  // Keep fixed v4 fixtures on their signed destination pair after route
-  // selection and after Vite hot reload restores existing form state.
-  useEffect(() => {
-    if (!dexRouteTestConfig) return;
-    setDestinationChainId(dexRouteTestConfig.destinationChainId.toString());
-    setDepositTokenAddress(dexRouteTestConfig.tokenIn.address);
-    setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
-  }, [dexRouteTestConfig]);
 
   const {
     isValid: isValidDeposit,
@@ -409,7 +368,7 @@ export default function BalancePage() {
     setQuoteResult(null);
     try {
       const dexRouteExtraData = buildDexRouteExtraData({
-        route: dexRoute,
+        route: "automatic-v3",
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
@@ -484,7 +443,6 @@ export default function BalancePage() {
     inputAmount,
     routingPreset,
     customSolverAddresses,
-    dexRoute,
     chainId,
     destinationChainId,
     depositTokenAddress,
@@ -496,7 +454,7 @@ export default function BalancePage() {
     if (!isFormValid) return;
     try {
       const dexRouteExtraData = buildDexRouteExtraData({
-        route: dexRoute,
+        route: "automatic-v3",
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
@@ -828,7 +786,7 @@ export default function BalancePage() {
                     setOutputTokenAddress(value);
                     setQuoteResult(null);
                   }}
-                  suggestions={outputTokenSuggestions}
+                  suggestions={outputTokenOptions}
                   symbol={outputSymbol}
                   decimals={outputDecimals}
                   isLoading={isLoadingOutput}
@@ -846,7 +804,7 @@ export default function BalancePage() {
                     setDepositTokenAddress(value);
                     setQuoteResult(null);
                   }}
-                  suggestions={inputTokenSuggestions}
+                  suggestions={graphTokens}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
                   balance={depositBalance}
@@ -925,51 +883,6 @@ export default function BalancePage() {
                   <p className="mt-1 text-xs text-gray-500">
                     Separate multiple addresses with commas or spaces.
                   </p>
-                </div>
-              )}
-
-              {tokenType === "erc20" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    DEX Pool Route
-                  </label>
-                  <select
-                    value={dexRoute}
-                    onChange={(event) => {
-                      const nextRoute = event.target.value as DexRouteId;
-                      setDexRoute(nextRoute);
-                      if (nextRoute === "ethereum-mainnet-stablepair-v4") {
-                        setRoutingPreset("external-multi-transactions");
-                      }
-                      const nextTestConfig = getDexRouteTestConfig(nextRoute);
-                      if (nextTestConfig) {
-                        setDestinationChainId(
-                          nextTestConfig.destinationChainId.toString(),
-                        );
-                        setDepositTokenAddress(nextTestConfig.tokenIn.address);
-                        setOutputTokenAddress(nextTestConfig.tokenOut.address);
-                      }
-                      setQuoteResult(null);
-                    }}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  >
-                    {DEX_ROUTE_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {
-                      DEX_ROUTE_OPTIONS.find((option) => option.id === dexRoute)
-                        ?.description
-                    }
-                  </p>
-                  {dexRouteTestConfig && (
-                    <p className="mt-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-xs leading-relaxed text-gray-300">
-                      {dexRouteTestConfig.testingInstructions}
-                    </p>
-                  )}
                 </div>
               )}
 
