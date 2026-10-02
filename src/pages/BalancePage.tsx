@@ -42,9 +42,11 @@ import {
 import {
   buildDexRouteExtraData,
   DEX_ROUTE_OPTIONS,
-  DUMMY_LENDING_TOKENS,
+  EXTERNAL_PROVIDER_OPTIONS,
+  getDexRouteTestConfig,
   getDexTestTokens,
   type DexRouteId,
+  type ExternalProviderSelection,
 } from "../config/dex-pools";
 
 interface IntentTransactionStatus {
@@ -162,8 +164,14 @@ export default function BalancePage() {
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
+  const [externalProvider, setExternalProvider] =
+    useState<ExternalProviderSelection>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
   const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
+  const dexRouteTestConfig = useMemo(
+    () => getDexRouteTestConfig(dexRoute),
+    [dexRoute],
+  );
 
   const routingAndLiquidityOptions = useMemo(
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
@@ -236,15 +244,15 @@ export default function BalancePage() {
     if (prevDestinationChainRef.current === destinationChainId) return;
     prevDestinationChainRef.current = destinationChainId;
     if (
-      dexRoute === "base-sepolia-hooked-v4" &&
-      destinationChainId === "84532"
+      dexRouteTestConfig &&
+      destinationChainId === dexRouteTestConfig.destinationChainId.toString()
     ) {
-      setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
+      setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
       return;
     }
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
-  }, [destinationChainId, dexRoute, outputTokenOptions]);
+  }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
@@ -256,14 +264,14 @@ export default function BalancePage() {
     }
   }, [chainId, destinationChains]);
 
-  // Keep the reusable hooked-pool fixture on its signed pair after route
+  // Keep fixed v4 fixtures on their signed destination pair after route
   // selection and after Vite hot reload restores existing form state.
   useEffect(() => {
-    if (dexRoute !== "base-sepolia-hooked-v4") return;
-    setDestinationChainId("84532");
-    setDepositTokenAddress(DUMMY_LENDING_TOKENS[0]!.address);
-    setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
-  }, [dexRoute]);
+    if (!dexRouteTestConfig) return;
+    setDestinationChainId(dexRouteTestConfig.destinationChainId.toString());
+    setDepositTokenAddress(dexRouteTestConfig.tokenIn.address);
+    setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
+  }, [dexRouteTestConfig]);
 
   const {
     isValid: isValidDeposit,
@@ -409,6 +417,7 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
+        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -476,7 +485,18 @@ export default function BalancePage() {
     if (!canFetchQuote || isLoadingQuote || isConfirming) return;
     void fetchIntentQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
-  }, [inputAmount, routingPreset, customSolverAddresses, dexRoute]);
+  }, [
+    inputAmount,
+    routingPreset,
+    customSolverAddresses,
+    dexRoute,
+    externalProvider,
+    chainId,
+    destinationChainId,
+    depositTokenAddress,
+    outputTokenAddress,
+    outputAmount,
+  ]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
@@ -486,6 +506,7 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
+        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -810,7 +831,10 @@ export default function BalancePage() {
                 <TokenAddressInput
                   label="Output Token Address (destination chain)"
                   value={outputTokenAddress}
-                  onChange={setOutputTokenAddress}
+                  onChange={(value) => {
+                    setOutputTokenAddress(value);
+                    setQuoteResult(null);
+                  }}
                   suggestions={outputTokenSuggestions}
                   symbol={outputSymbol}
                   decimals={outputDecimals}
@@ -825,7 +849,10 @@ export default function BalancePage() {
                 <TokenAddressInput
                   label="Input Token Address (source chain)"
                   value={depositTokenAddress}
-                  onChange={setDepositTokenAddress}
+                  onChange={(value) => {
+                    setDepositTokenAddress(value);
+                    setQuoteResult(null);
+                  }}
                   suggestions={inputTokenSuggestions}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
@@ -843,7 +870,10 @@ export default function BalancePage() {
                 </label>
                 <select
                   value={destinationChainId}
-                  onChange={(e) => setDestinationChainId(e.target.value)}
+                  onChange={(e) => {
+                    setDestinationChainId(e.target.value);
+                    setQuoteResult(null);
+                  }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                 >
                   {destinationChains.map((chain) => (
@@ -884,6 +914,36 @@ export default function BalancePage() {
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  External Quote Provider
+                </label>
+                <select
+                  value={externalProvider}
+                  onChange={(event) => {
+                    const provider = event.target
+                      .value as ExternalProviderSelection;
+                    setExternalProvider(provider);
+                    if (provider !== "any") {
+                      setRoutingPreset("external-multi-transactions");
+                    }
+                    setQuoteResult(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  {EXTERNAL_PROVIDER_OPTIONS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  A specific provider is signed as <code>provider</code> and
+                  uses the external multi-transaction solver. “Any” leaves the
+                  provider unsigned so enabled solvers can compete.
+                </p>
+              </div>
+
               {routingPreset === "custom" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -915,12 +975,16 @@ export default function BalancePage() {
                     onChange={(event) => {
                       const nextRoute = event.target.value as DexRouteId;
                       setDexRoute(nextRoute);
-                      if (nextRoute === "base-sepolia-hooked-v4") {
-                        setDestinationChainId("84532");
-                        setDepositTokenAddress(
-                          DUMMY_LENDING_TOKENS[0]!.address,
+                      if (nextRoute === "ethereum-mainnet-stablepair-v4") {
+                        setRoutingPreset("external-multi-transactions");
+                      }
+                      const nextTestConfig = getDexRouteTestConfig(nextRoute);
+                      if (nextTestConfig) {
+                        setDestinationChainId(
+                          nextTestConfig.destinationChainId.toString(),
                         );
-                        setOutputTokenAddress(DUMMY_LENDING_TOKENS[1]!.address);
+                        setDepositTokenAddress(nextTestConfig.tokenIn.address);
+                        setOutputTokenAddress(nextTestConfig.tokenOut.address);
                       }
                       setQuoteResult(null);
                     }}
@@ -938,12 +1002,9 @@ export default function BalancePage() {
                         ?.description
                     }
                   </p>
-                  {dexRoute === "base-sepolia-hooked-v4" && (
+                  {dexRouteTestConfig && (
                     <p className="mt-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-xs leading-relaxed text-gray-300">
-                      Cross-chain fixture: switch your source wallet to Sepolia
-                      (11155111), then keep Base Sepolia (84532) as the
-                      destination. This route automatically selects Test USDC
-                      input and Test USDT output.
+                      {dexRouteTestConfig.testingInstructions}
                     </p>
                   )}
                 </div>
@@ -957,7 +1018,10 @@ export default function BalancePage() {
                   <input
                     type="text"
                     value={outputAmount}
-                    onChange={(e) => setOutputAmount(e.target.value)}
+                    onChange={(e) => {
+                      setOutputAmount(e.target.value);
+                      setQuoteResult(null);
+                    }}
                     placeholder="0.0"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
@@ -969,7 +1033,10 @@ export default function BalancePage() {
                   <input
                     type="text"
                     value={inputAmountDisplay}
-                    onChange={(e) => setInputAmountDisplay(e.target.value)}
+                    onChange={(e) => {
+                      setInputAmountDisplay(e.target.value);
+                      setQuoteResult(null);
+                    }}
                     placeholder="0.0"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
@@ -1006,6 +1073,39 @@ export default function BalancePage() {
                       <span className="text-gray-500">routing:</span>{" "}
                       <span className="text-gray-200">{routingPreset}</span>
                     </div>
+                    {quoteResult.externalExecution && (
+                      <div className="col-span-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-gray-300">
+                        <div className="font-medium text-[#00ff00]">
+                          {quoteResult.externalExecution.provider ?? "External"}{" "}
+                          execution plan
+                        </div>
+                        <div className="mt-1">
+                          {
+                            quoteResult.externalExecution.sourceTransactions
+                              .length
+                          }{" "}
+                          source transaction(s) on chain{" "}
+                          {quoteResult.externalExecution.sourceChainId}; the
+                          destination v4 calldata is refreshed after external
+                          settlement.
+                        </div>
+                        {quoteResult.externalExecution.destinationSwap && (
+                          <div className="mt-1">
+                            Then sign{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .executionTransactions.length
+                            }{" "}
+                            destination transaction(s) on chain{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .chainId
+                            }
+                            .
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Use tokenOut to tweak Input Amount for expected output.

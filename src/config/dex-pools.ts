@@ -1,11 +1,36 @@
 import {
   DEX_POOLS_EXTRA_TYPESTRING,
   encodeDexPools,
+  EXTERNAL_PROVIDER_EXTRA_TYPESTRING,
+  EXTERNAL_QUOTE_PROVIDERS,
+  type ExternalQuoteProvider,
   type UniswapV4PoolPreference,
 } from "@epoch-protocol/epoch-commons-sdk";
 import type { TokenInfo } from "./web3";
 
-export type DexRouteId = "automatic-v3" | "base-sepolia-hooked-v4";
+export type DexRouteId =
+  "automatic-v3" | "base-sepolia-hooked-v4" | "ethereum-mainnet-stablepair-v4";
+
+export type ExternalProviderSelection = "any" | ExternalQuoteProvider;
+
+const EXTERNAL_PROVIDER_LABELS: Record<ExternalQuoteProvider, string> = {
+  khalani: "Khalani only",
+  near: "NEAR Intents only",
+  lifi: "LI.FI only",
+  sodax: "Sodax only",
+};
+
+/** Providers understood by the external solver's signed `provider` field. */
+export const EXTERNAL_PROVIDER_OPTIONS: ReadonlyArray<{
+  id: ExternalProviderSelection;
+  label: string;
+}> = [
+  { id: "any", label: "Any enabled provider" },
+  ...EXTERNAL_QUOTE_PROVIDERS.map((id) => ({
+    id,
+    label: EXTERNAL_PROVIDER_LABELS[id],
+  })),
+];
 
 export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
   id: DexRouteId;
@@ -22,6 +47,12 @@ export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
     label: "Base Sepolia hooked Uniswap v4 pool",
     description:
       "Use the deployed PoolKey on the Base Sepolia destination chain.",
+  },
+  {
+    id: "ethereum-mainnet-stablepair-v4",
+    label: "Ethereum mainnet USDC/USDT Uniswap v4",
+    description:
+      "Test the external bridge plus Uniswap v4 flow against Uniswap's public StablePairHook pool on Ethereum.",
   },
 ];
 
@@ -59,13 +90,81 @@ const BASE_SEPOLIA_HOOKED_POOL: UniswapV4PoolPreference = {
     "0x70518dc220115fec722d1c344e307ec149ec2f25dc54c87a8908cb22e29867d1",
 };
 
+/**
+ * Official Uniswap StablePairHook pool on Ethereum mainnet. The hook's
+ * deployment and initialized USDC/USDT PoolKey are published by Uniswap:
+ * https://github.com/Uniswap/v4-hooks-public#stablepairhook
+ */
+const ETHEREUM_MAINNET_STABLEPAIR_POOL: UniswapV4PoolPreference = {
+  protocol: "uniswap-v4",
+  chainId: 1,
+  poolKey: {
+    currency0: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    currency1: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    fee: 0x800000,
+    tickSpacing: 1,
+    hooks: "0x0000113dCf4ADd69999Fad8F20F2b63F979bfcC0",
+  },
+  hookData: "0x",
+};
+
+type FixedV4RouteId = Exclude<DexRouteId, "automatic-v3">;
+
+type FixedV4Route = {
+  destinationChainId: number;
+  pool: UniswapV4PoolPreference;
+  tokenIn: TokenInfo;
+  tokenOut: TokenInfo;
+  testingInstructions: string;
+};
+
+const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
+  "base-sepolia-hooked-v4": {
+    destinationChainId: 84532,
+    pool: BASE_SEPOLIA_HOOKED_POOL,
+    tokenIn: DUMMY_LENDING_TOKENS[0]!,
+    tokenOut: DUMMY_LENDING_TOKENS[1]!,
+    testingInstructions:
+      "Cross-chain fixture: switch your source wallet to Sepolia (11155111). The destination is Base Sepolia (84532), using Test USDC to Test USDT.",
+  },
+  "ethereum-mainnet-stablepair-v4": {
+    destinationChainId: 1,
+    pool: ETHEREUM_MAINNET_STABLEPAIR_POOL,
+    tokenIn: {
+      symbol: "USDC",
+      address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      decimals: 6,
+    },
+    tokenOut: {
+      symbol: "USDT",
+      address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      decimals: 6,
+    },
+    testingInstructions:
+      "Mainnet test: switch your wallet to Ethereum (1). This route uses the External — multi-transaction tier; use Get Quote to inspect the external bridge and destination v4 plan before submitting a real intent.",
+  },
+};
+
 const DEFAULT_EXTRA_DATA = {
   extraDataTypestring: "uint256 somethingKey",
   extraData: { somethingKey: "123" },
 };
 
+export type DexRouteExtraData = {
+  extraDataTypestring: string;
+  extraData: {
+    somethingKey: string;
+    provider?: ExternalQuoteProvider;
+    dexPools?: string;
+  };
+};
+
 function sameAddress(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
+}
+
+export function getDexRouteTestConfig(route: DexRouteId): FixedV4Route | null {
+  return route === "automatic-v3" ? null : FIXED_V4_ROUTES[route];
 }
 
 export function buildDexRouteExtraData(params: {
@@ -73,29 +172,45 @@ export function buildDexRouteExtraData(params: {
   destinationChainId: number | undefined;
   tokenIn: string;
   tokenOut: string;
-}) {
-  if (params.route === "automatic-v3") return DEFAULT_EXTRA_DATA;
+  provider?: ExternalQuoteProvider;
+}): DexRouteExtraData {
+  const route = getDexRouteTestConfig(params.route);
+  if (!route) {
+    return params.provider
+      ? {
+          extraDataTypestring: `${DEFAULT_EXTRA_DATA.extraDataTypestring},${EXTERNAL_PROVIDER_EXTRA_TYPESTRING}`,
+          extraData: {
+            ...DEFAULT_EXTRA_DATA.extraData,
+            provider: params.provider,
+          },
+        }
+      : DEFAULT_EXTRA_DATA;
+  }
 
-  const key = BASE_SEPOLIA_HOOKED_POOL.poolKey;
+  const key = route.pool.poolKey;
   const pairMatches =
     (sameAddress(params.tokenIn, key.currency0) &&
       sameAddress(params.tokenOut, key.currency1)) ||
     (sameAddress(params.tokenIn, key.currency1) &&
       sameAddress(params.tokenOut, key.currency0));
-  if (
-    params.destinationChainId !== BASE_SEPOLIA_HOOKED_POOL.chainId ||
-    !pairMatches
-  ) {
+  if (params.destinationChainId !== route.destinationChainId || !pairMatches) {
     throw new Error(
-      "The hooked v4 route requires Base Sepolia as the destination and its deployed USDC/USDT pair.",
+      "The selected v4 route requires its configured destination chain and token pair.",
     );
   }
 
   return {
-    extraDataTypestring: `${DEFAULT_EXTRA_DATA.extraDataTypestring},${DEX_POOLS_EXTRA_TYPESTRING}`,
+    extraDataTypestring: [
+      DEFAULT_EXTRA_DATA.extraDataTypestring,
+      params.provider ? EXTERNAL_PROVIDER_EXTRA_TYPESTRING : undefined,
+      DEX_POOLS_EXTRA_TYPESTRING,
+    ]
+      .filter((entry): entry is string => Boolean(entry))
+      .join(","),
     extraData: {
       ...DEFAULT_EXTRA_DATA.extraData,
-      dexPools: encodeDexPools([BASE_SEPOLIA_HOOKED_POOL]),
+      ...(params.provider ? { provider: params.provider } : {}),
+      dexPools: encodeDexPools([route.pool]),
     },
   };
 }

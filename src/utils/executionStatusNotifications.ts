@@ -80,6 +80,15 @@ export function getExecutionStatusNotification(
         chainId: status.chainId,
         autoHide: false,
       };
+    case "settling":
+      return {
+        type: "info",
+        title: "Waiting for Sodax settlement",
+        message:
+          "Your source transaction is confirmed. Waiting for the destination asset before refreshing Uniswap v4 calldata…",
+        stage: "confirmed",
+        ...inProgress,
+      };
     default:
       return null;
   }

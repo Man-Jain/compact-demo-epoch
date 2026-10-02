@@ -1,5 +1,6 @@
 import { http } from "wagmi";
 import {
+  mainnet,
   sepolia,
   baseSepolia,
   optimismSepolia,
@@ -16,6 +17,7 @@ import { getRpcUrlForChain } from "./rpc";
 const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
 
 export const chains = [
+  mainnet,
   sepolia,
   baseSepolia,
   optimismSepolia,
@@ -46,6 +48,7 @@ export const config = getDefaultConfig({
 });
 
 export const CHAIN_IDS = {
+  MAINNET: mainnet.id,
   SEPOLIA: sepolia.id,
   BASE_SEPOLIA: baseSepolia.id,
   OPTIMISM_SEPOLIA: optimismSepolia.id,
