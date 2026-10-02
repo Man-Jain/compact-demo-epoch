@@ -42,11 +42,9 @@ import {
 import {
   buildDexRouteExtraData,
   DEX_ROUTE_OPTIONS,
-  EXTERNAL_PROVIDER_OPTIONS,
   getDexRouteTestConfig,
   getDexTestTokens,
   type DexRouteId,
-  type ExternalProviderSelection,
 } from "../config/dex-pools";
 
 interface IntentTransactionStatus {
@@ -164,8 +162,6 @@ export default function BalancePage() {
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
-  const [externalProvider, setExternalProvider] =
-    useState<ExternalProviderSelection>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
   const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
   const dexRouteTestConfig = useMemo(
@@ -417,7 +413,6 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
-        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -490,7 +485,6 @@ export default function BalancePage() {
     routingPreset,
     customSolverAddresses,
     dexRoute,
-    externalProvider,
     chainId,
     destinationChainId,
     depositTokenAddress,
@@ -506,7 +500,6 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
-        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -911,36 +904,6 @@ export default function BalancePage() {
                       (option) => option.value === routingPreset,
                     )?.description
                   }
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  External Quote Provider
-                </label>
-                <select
-                  value={externalProvider}
-                  onChange={(event) => {
-                    const provider = event.target
-                      .value as ExternalProviderSelection;
-                    setExternalProvider(provider);
-                    if (provider !== "any") {
-                      setRoutingPreset("external-multi-transactions");
-                    }
-                    setQuoteResult(null);
-                  }}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                >
-                  {EXTERNAL_PROVIDER_OPTIONS.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  A specific provider is signed as <code>provider</code> and
-                  uses the external multi-transaction solver. “Any” leaves the
-                  provider unsigned so enabled solvers can compete.
                 </p>
               </div>
 
