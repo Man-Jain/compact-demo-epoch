@@ -32,12 +32,14 @@ import {
   EXECUTION_STATUS_NOTIFICATION_ID,
   getExecutionStatusNotification,
 } from "../utils/executionStatusNotifications";
+import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
   getChainsFromGraph,
   isTestnetChain,
 } from "../config/web3";
+import { buildDexRouteExtraData } from "../config/dex-pools";
 
 interface IntentTransactionStatus {
   status: string;
@@ -191,6 +193,9 @@ export default function BalancePage() {
     () => getChainsFromGraph(chainId),
     [chainId],
   );
+  const destinationChainIdNumber = destinationChainId
+    ? parseInt(destinationChainId, 10)
+    : undefined;
   // Output token options = tokens on the selected destination chain
   const outputTokenOptions = useMemo(() => {
     if (!destinationChainId) return [];
@@ -200,7 +205,6 @@ export default function BalancePage() {
       (token) => token.address.toLowerCase() !== zeroAddress,
     );
   }, [destinationChainId]);
-
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
 
@@ -229,10 +233,6 @@ export default function BalancePage() {
       setDestinationChainId(destinationChains[0].chainId.toString());
     }
   }, [chainId, destinationChains]);
-
-  const destinationChainIdNumber = destinationChainId
-    ? parseInt(destinationChainId, 10)
-    : undefined;
 
   const {
     isValid: isValidDeposit,
@@ -373,6 +373,12 @@ export default function BalancePage() {
     setIsLoadingQuote(true);
     setQuoteResult(null);
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: "automatic-v3",
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: depositChecksumAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
@@ -397,10 +403,7 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
       });
 
       const result = await epochSdk.getIntentQuote({
@@ -442,11 +445,26 @@ export default function BalancePage() {
     if (!canFetchQuote || isLoadingQuote || isConfirming) return;
     void fetchIntentQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
-  }, [inputAmount, routingPreset, customSolverAddresses]);
+  }, [
+    inputAmount,
+    routingPreset,
+    customSolverAddresses,
+    chainId,
+    destinationChainId,
+    depositTokenAddress,
+    outputTokenAddress,
+    outputAmount,
+  ]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: "automatic-v3",
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: depositChecksumAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
@@ -471,10 +489,7 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
       });
 
       console.log("taskTypeString: ", taskTypeString);
@@ -539,13 +554,10 @@ export default function BalancePage() {
       }
 
       showNotification({
-        type: "success",
-        title: "Deposit + Register + Allocation",
-        message: data?.gaslessUsed
-          ? "Gasless deposit submitted, compact registered, and allocation created"
-          : "Deposit submitted, compact registered, and allocation created",
+        ...createSolveCompletionNotification({
+          gaslessUsed: data?.gaslessUsed,
+        }),
         chainId,
-        autoHide: true,
       });
     } catch (error) {
       showNotification({
@@ -776,7 +788,10 @@ export default function BalancePage() {
                 <TokenAddressInput
                   label="Output Token Address (destination chain)"
                   value={outputTokenAddress}
-                  onChange={setOutputTokenAddress}
+                  onChange={(value) => {
+                    setOutputTokenAddress(value);
+                    setQuoteResult(null);
+                  }}
                   suggestions={outputTokenOptions}
                   symbol={outputSymbol}
                   decimals={outputDecimals}
@@ -791,7 +806,10 @@ export default function BalancePage() {
                 <TokenAddressInput
                   label="Input Token Address (source chain)"
                   value={depositTokenAddress}
-                  onChange={setDepositTokenAddress}
+                  onChange={(value) => {
+                    setDepositTokenAddress(value);
+                    setQuoteResult(null);
+                  }}
                   suggestions={erc20Tokens}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
@@ -809,7 +827,10 @@ export default function BalancePage() {
                 </label>
                 <select
                   value={destinationChainId}
-                  onChange={(e) => setDestinationChainId(e.target.value)}
+                  onChange={(e) => {
+                    setDestinationChainId(e.target.value);
+                    setQuoteResult(null);
+                  }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                 >
                   {destinationChains.map((chain) => (
@@ -879,7 +900,10 @@ export default function BalancePage() {
                   <input
                     type="text"
                     value={outputAmount}
-                    onChange={(e) => setOutputAmount(e.target.value)}
+                    onChange={(e) => {
+                      setOutputAmount(e.target.value);
+                      setQuoteResult(null);
+                    }}
                     placeholder="0.0"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
@@ -891,7 +915,10 @@ export default function BalancePage() {
                   <input
                     type="text"
                     value={inputAmountDisplay}
-                    onChange={(e) => setInputAmountDisplay(e.target.value)}
+                    onChange={(e) => {
+                      setInputAmountDisplay(e.target.value);
+                      setQuoteResult(null);
+                    }}
                     placeholder="0.0"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   />
@@ -928,6 +955,39 @@ export default function BalancePage() {
                       <span className="text-gray-500">routing:</span>{" "}
                       <span className="text-gray-200">{routingPreset}</span>
                     </div>
+                    {quoteResult.externalExecution && (
+                      <div className="col-span-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-gray-300">
+                        <div className="font-medium text-[#00ff00]">
+                          {quoteResult.externalExecution.provider ?? "External"}{" "}
+                          execution plan
+                        </div>
+                        <div className="mt-1">
+                          {
+                            quoteResult.externalExecution.sourceTransactions
+                              .length
+                          }{" "}
+                          source transaction(s) on chain{" "}
+                          {quoteResult.externalExecution.sourceChainId}; the
+                          destination v4 calldata is refreshed after external
+                          settlement.
+                        </div>
+                        {quoteResult.externalExecution.destinationSwap && (
+                          <div className="mt-1">
+                            Then sign{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .executionTransactions.length
+                            }{" "}
+                            destination transaction(s) on chain{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .chainId
+                            }
+                            .
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Use tokenOut to tweak Input Amount for expected output.
@@ -967,6 +1027,13 @@ export default function BalancePage() {
                   {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
                 </button>
               </div>
+              {!canFetchQuote && (
+                <p className="text-xs text-yellow-400">
+                  Get Quote activates after a wallet is connected, the allocator
+                  is available, and both ERC-20 token addresses have resolved on
+                  their selected chains.
+                </p>
+              )}
             </div>
             <div>
               <AccountResourceLockBalances />

@@ -1,8 +1,10 @@
 import type { TransactionExecutionStatus } from "@epoch-protocol/epoch-intents-sdk";
 import { getChainName } from "./chains";
+import { EXECUTION_STATUS_NOTIFICATION_ID } from "./solveCompletionNotification";
+
+export { EXECUTION_STATUS_NOTIFICATION_ID } from "./solveCompletionNotification";
 
 /** Stable id so in-progress execution alerts replace each other */
-export const EXECUTION_STATUS_NOTIFICATION_ID = "pending-solve-intent";
 
 type ExecutionNotification = {
   type: "success" | "error" | "warning" | "info";
@@ -77,6 +79,15 @@ export function getExecutionStatusNotification(
         txHash: status.transactionHash,
         chainId: status.chainId,
         autoHide: false,
+      };
+    case "settling":
+      return {
+        type: "info",
+        title: "Waiting for Sodax settlement",
+        message:
+          "Your source transaction is confirmed. Waiting for the destination asset before refreshing Uniswap v4 calldata…",
+        stage: "confirmed",
+        ...inProgress,
       };
     default:
       return null;
