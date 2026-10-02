@@ -39,7 +39,15 @@ import {
   getChainsFromGraph,
   isTestnetChain,
 } from "../config/web3";
-import { buildDexRouteExtraData } from "../config/dex-pools";
+import {
+  buildDexRouteExtraData,
+  DEX_ROUTE_OPTIONS,
+  EXTERNAL_PROVIDER_OPTIONS,
+  getDexRouteTestConfig,
+  getDexTestTokens,
+  type DexRouteId,
+  type ExternalProviderSelection,
+} from "../config/dex-pools";
 
 interface IntentTransactionStatus {
   status: string;
@@ -156,7 +164,14 @@ export default function BalancePage() {
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
+  const [externalProvider, setExternalProvider] =
+    useState<ExternalProviderSelection>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
+  const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
+  const dexRouteTestConfig = useMemo(
+    () => getDexRouteTestConfig(dexRoute),
+    [dexRoute],
+  );
 
   const routingAndLiquidityOptions = useMemo(
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
@@ -186,7 +201,10 @@ export default function BalancePage() {
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
   const erc20Tokens = useMemo(
-    () => graphTokens.filter((token) => token.address.toLowerCase() !== zeroAddress),
+    () =>
+      graphTokens.filter(
+        (token) => token.address.toLowerCase() !== zeroAddress,
+      ),
     [graphTokens],
   );
   const destinationChains = useMemo(
@@ -205,6 +223,20 @@ export default function BalancePage() {
       (token) => token.address.toLowerCase() !== zeroAddress,
     );
   }, [destinationChainId]);
+  const inputTokenSuggestions = useMemo(
+    () => [...erc20Tokens, ...getDexTestTokens(chainId)],
+    [chainId, erc20Tokens],
+  );
+  const outputTokenSuggestions = useMemo(
+    () => [
+      ...outputTokenOptions,
+      ...(destinationChainIdNumber
+        ? getDexTestTokens(destinationChainIdNumber)
+        : []),
+    ],
+    [destinationChainIdNumber, outputTokenOptions],
+  );
+
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
 
@@ -220,9 +252,16 @@ export default function BalancePage() {
   useEffect(() => {
     if (prevDestinationChainRef.current === destinationChainId) return;
     prevDestinationChainRef.current = destinationChainId;
+    if (
+      dexRouteTestConfig &&
+      destinationChainId === dexRouteTestConfig.destinationChainId.toString()
+    ) {
+      setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
+      return;
+    }
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
-  }, [destinationChainId, outputTokenOptions]);
+  }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
@@ -374,10 +413,11 @@ export default function BalancePage() {
     setQuoteResult(null);
     try {
       const dexRouteExtraData = buildDexRouteExtraData({
-        route: "automatic-v3",
+        route: dexRoute,
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
+        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -449,6 +489,8 @@ export default function BalancePage() {
     inputAmount,
     routingPreset,
     customSolverAddresses,
+    dexRoute,
+    externalProvider,
     chainId,
     destinationChainId,
     depositTokenAddress,
@@ -460,10 +502,11 @@ export default function BalancePage() {
     if (!isFormValid) return;
     try {
       const dexRouteExtraData = buildDexRouteExtraData({
-        route: "automatic-v3",
+        route: dexRoute,
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
+        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -792,7 +835,7 @@ export default function BalancePage() {
                     setOutputTokenAddress(value);
                     setQuoteResult(null);
                   }}
-                  suggestions={outputTokenOptions}
+                  suggestions={outputTokenSuggestions}
                   symbol={outputSymbol}
                   decimals={outputDecimals}
                   isLoading={isLoadingOutput}
@@ -810,7 +853,7 @@ export default function BalancePage() {
                     setDepositTokenAddress(value);
                     setQuoteResult(null);
                   }}
-                  suggestions={erc20Tokens}
+                  suggestions={inputTokenSuggestions}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
                   balance={depositBalance}
@@ -871,6 +914,36 @@ export default function BalancePage() {
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  External Quote Provider
+                </label>
+                <select
+                  value={externalProvider}
+                  onChange={(event) => {
+                    const provider = event.target
+                      .value as ExternalProviderSelection;
+                    setExternalProvider(provider);
+                    if (provider !== "any") {
+                      setRoutingPreset("external-multi-transactions");
+                    }
+                    setQuoteResult(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  {EXTERNAL_PROVIDER_OPTIONS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  A specific provider is signed as <code>provider</code> and
+                  uses the external multi-transaction solver. “Any” leaves the
+                  provider unsigned so enabled solvers can compete.
+                </p>
+              </div>
+
               {routingPreset === "custom" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -889,6 +962,61 @@ export default function BalancePage() {
                   <p className="mt-1 text-xs text-gray-500">
                     Separate multiple addresses with commas or spaces.
                   </p>
+                </div>
+              )}
+
+              {tokenType === "erc20" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    DEX Pool Route
+                  </label>
+                  <select
+                    value={dexRoute}
+                    onChange={(event) => {
+                      const nextRoute = event.target.value as DexRouteId;
+                      setDexRoute(nextRoute);
+                      if (nextRoute === "ethereum-mainnet-stablepair-v4") {
+                        setRoutingPreset("external-multi-transactions");
+                      }
+                      const nextTestConfig = getDexRouteTestConfig(nextRoute);
+                      if (nextTestConfig) {
+                        setDestinationChainId(
+                          nextTestConfig.destinationChainId.toString(),
+                        );
+                        if (
+                          inputTokenSuggestions.some(
+                            (token) =>
+                              token.address.toLowerCase() ===
+                              nextTestConfig.tokenIn.address.toLowerCase(),
+                          )
+                        ) {
+                          setDepositTokenAddress(
+                            nextTestConfig.tokenIn.address,
+                          );
+                        }
+                        setOutputTokenAddress(nextTestConfig.tokenOut.address);
+                      }
+                      setQuoteResult(null);
+                    }}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                  >
+                    {DEX_ROUTE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {
+                      DEX_ROUTE_OPTIONS.find((option) => option.id === dexRoute)
+                        ?.description
+                    }
+                  </p>
+                  {dexRouteTestConfig && (
+                    <p className="mt-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-xs leading-relaxed text-gray-300">
+                      {dexRouteTestConfig.testingInstructions}
+                    </p>
+                  )}
                 </div>
               )}
 

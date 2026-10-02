@@ -188,12 +188,15 @@ export function buildDexRouteExtraData(params: {
   }
 
   const key = route.pool.poolKey;
-  const pairMatches =
-    (sameAddress(params.tokenIn, key.currency0) &&
-      sameAddress(params.tokenOut, key.currency1)) ||
-    (sameAddress(params.tokenIn, key.currency1) &&
-      sameAddress(params.tokenOut, key.currency0));
-  if (params.destinationChainId !== route.destinationChainId || !pairMatches) {
+  // The external provider bridges the source asset to the destination pool.
+  // Only the final output must be a currency in that destination PoolKey.
+  const outputMatches =
+    sameAddress(params.tokenOut, key.currency0) ||
+    sameAddress(params.tokenOut, key.currency1);
+  if (
+    params.destinationChainId !== route.destinationChainId ||
+    !outputMatches
+  ) {
     throw new Error(
       "The selected v4 route requires its configured destination chain and token pair.",
     );

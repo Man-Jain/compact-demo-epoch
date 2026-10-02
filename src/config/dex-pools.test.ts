@@ -50,3 +50,28 @@ test("combines a selected provider and hooked v4 PoolKey in one witness", () => 
   assert.equal(result.extraData.provider, "sodax");
   assert.equal(typeof result.extraData.dexPools, "string");
 });
+
+test("allows a different source asset for an external destination v4 swap", () => {
+  const result = buildDexRouteExtraData({
+    route: "base-sepolia-hooked-v4",
+    destinationChainId: 84532,
+    tokenIn: "0x7946dd86eE310D0aC16804A37787289Fa5b88A8A",
+    tokenOut: BASE_SEPOLIA_USDT,
+    provider: "lifi",
+  });
+  assert.equal(result.extraData.provider, "lifi");
+  assert.equal(typeof result.extraData.dexPools, "string");
+});
+
+test("rejects a preferred Ethereum pool when the destination is Robinhood", () => {
+  assert.throws(
+    () =>
+      buildDexRouteExtraData({
+        route: "ethereum-mainnet-stablepair-v4",
+        destinationChainId: 4663,
+        tokenIn: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        tokenOut: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      }),
+    /configured destination chain and token pair/,
+  );
+});
