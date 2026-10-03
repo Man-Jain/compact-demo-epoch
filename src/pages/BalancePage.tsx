@@ -446,7 +446,9 @@ export default function BalancePage() {
   ]);
 
   useEffect(() => {
-    quoteRequestGateRef.current.invalidate();
+    if (quoteRequestGateRef.current.invalidate()) {
+      setIsLoadingQuote(false);
+    }
   }, [
     chainId,
     customSolverAddresses,
@@ -530,7 +532,7 @@ export default function BalancePage() {
         chainId,
       });
     } finally {
-      if (quoteRequestGateRef.current.isCurrent(requestId)) {
+      if (quoteRequestGateRef.current.complete(requestId)) {
         setIsLoadingQuote(false);
       }
     }
@@ -543,7 +545,7 @@ export default function BalancePage() {
       isFirstQuoteInputChange.current = false;
       return;
     }
-    if (!canFetchQuote || isLoadingQuote || isConfirming) return;
+    if (!canFetchQuote || isConfirming) return;
     void fetchIntentQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
   }, [

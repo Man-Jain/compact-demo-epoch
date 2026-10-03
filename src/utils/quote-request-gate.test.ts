@@ -7,6 +7,8 @@ test("drops a quote response after the form begins a newer request", () => {
     quoteRequestGate as typeof quoteRequestGate & {
       createQuoteRequestGate?: () => {
         begin(): number;
+        complete(requestId: number): boolean;
+        invalidate(): boolean;
         isCurrent(requestId: number): boolean;
       };
     }
@@ -20,4 +22,27 @@ test("drops a quote response after the form begins a newer request", () => {
 
   assert.equal(gate.isCurrent(first), false);
   assert.equal(gate.isCurrent(second), true);
+});
+
+test("reports when invalidation clears an active quote", () => {
+  const createGate = (
+    quoteRequestGate as typeof quoteRequestGate & {
+      createQuoteRequestGate?: () => {
+        begin(): number;
+        invalidate(): boolean;
+        isCurrent(requestId: number): boolean;
+      };
+    }
+  ).createQuoteRequestGate;
+
+  const gate = createGate!();
+  const pending = gate.begin();
+
+  assert.equal(gate.invalidate(), true);
+  assert.equal(gate.isCurrent(pending), false);
+  assert.equal(gate.invalidate(), false);
+
+  const next = gate.begin();
+  assert.equal(gate.complete(next), true);
+  assert.equal(gate.invalidate(), false);
 });
