@@ -83,7 +83,7 @@ export function getExecutionStatusNotification(
     case "settling":
       return {
         type: "info",
-        title: "Waiting for Sodax settlement",
+        title: "Waiting for LI.FI bridge",
         message:
           "Your source transaction is confirmed. Waiting for the destination asset before refreshing Uniswap v4 calldata…",
         stage: "confirmed",

@@ -49,8 +49,6 @@ import {
   getDexRouteTestConfig,
   getDexTestTokens,
   getFixedV4DestinationTokens,
-  getSodaxDefaultToken,
-  getSodaxSelectableTokens,
   type DexRouteId,
   type ExternalProviderSelection,
 } from "../config/dex-pools";
@@ -231,11 +229,8 @@ export default function BalancePage() {
     );
   }, [destinationChainId]);
   const inputTokenSuggestions = useMemo(() => {
-    const fallback = [...erc20Tokens, ...getDexTestTokens(chainId)];
-    return externalProvider === "sodax"
-      ? getSodaxSelectableTokens(chainId, fallback)
-      : fallback;
-  }, [chainId, erc20Tokens, externalProvider]);
+    return [...erc20Tokens, ...getDexTestTokens(chainId)];
+  }, [chainId, erc20Tokens]);
   const outputTokenSuggestions = useMemo(() => {
     const fixedRouteTokens = destinationChainIdNumber
       ? getFixedV4DestinationTokens(destinationChainIdNumber)
@@ -247,18 +242,14 @@ export default function BalancePage() {
         : []),
       ...fixedRouteTokens,
     ];
-    const candidates =
-      externalProvider === "sodax" && destinationChainIdNumber
-        ? getSodaxSelectableTokens(destinationChainIdNumber, fallback)
-        : fallback;
-    return candidates.filter(
+    return fallback.filter(
       (token, index) =>
-        candidates.findIndex(
+        fallback.findIndex(
           (candidate) =>
             candidate.address.toLowerCase() === token.address.toLowerCase(),
         ) === index,
     );
-  }, [destinationChainIdNumber, externalProvider, outputTokenOptions]);
+  }, [destinationChainIdNumber, outputTokenOptions]);
 
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
@@ -285,36 +276,6 @@ export default function BalancePage() {
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
   }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
-
-  // Sodax rejects unsupported assets before it can construct a cross-chain
-  // route. Normalize configured demo chains to the verified pair on selection.
-  useEffect(() => {
-    if (externalProvider !== "sodax") return;
-
-    const input = getSodaxDefaultToken(chainId);
-    if (
-      input &&
-      depositTokenAddress.toLowerCase() !== input.address.toLowerCase()
-    ) {
-      setDepositTokenAddress(input.address);
-    }
-
-    if (destinationChainIdNumber) {
-      const output = getSodaxDefaultToken(destinationChainIdNumber);
-      if (
-        output &&
-        outputTokenAddress.toLowerCase() !== output.address.toLowerCase()
-      ) {
-        setOutputTokenAddress(output.address);
-      }
-    }
-  }, [
-    chainId,
-    depositTokenAddress,
-    destinationChainIdNumber,
-    externalProvider,
-    outputTokenAddress,
-  ]);
 
   // Configured destination assets sign their public Robinhood PoolKeys and pin
   // LI.FI for the bridge leg.

@@ -13,7 +13,7 @@ Under **External Quote Provider**, choose one of:
 
 - **Any enabled provider** — leaves `provider` out of the witness and lets
   enabled solvers compete.
-- **Khalani only**, **NEAR Intents only**, **LI.FI only**, or **Sodax only** —
+- **Khalani only**, **NEAR Intents only**, or **LI.FI only** —
   signs the selected provider and switches the routing preset to **External —
   multi-transaction**.
 
@@ -44,7 +44,7 @@ For a provider-specific preferred v4 route, the witness has this shape:
 ```ts
 extraDataTypestring: "string provider,string dexPools"
 extraData: {
-  provider: "khalani", // or near, lifi, sodax
+  provider: "khalani", // or near, lifi
   dexPools: encodeDexPools([pool]),
 }
 ```
