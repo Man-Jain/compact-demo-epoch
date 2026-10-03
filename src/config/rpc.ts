@@ -10,7 +10,7 @@ import {
 } from "viem/chains";
 
 /** RPC URLs for supported chains (including chains not in wagmi config). */
-const ANKR_API_KEY = import.meta.env.VITE_ANKR_API_KEY;
+const ANKR_API_KEY = import.meta.env?.VITE_ANKR_API_KEY;
 
 function ankrRpc(network: string, fallback: string): string {
   return ANKR_API_KEY

@@ -70,6 +70,24 @@ export function getExecutionStatusNotification(
         stage: "submitted",
         ...inProgress,
       };
+    case "batching":
+      return {
+        type: "info",
+        title: "Preparing wallet batch",
+        message: `${label}: asking your wallet for a user-paid atomic batch on ${chainName}. No gas sponsor is used.`,
+        stage: "submitted",
+        ...inProgress,
+      };
+    case "wallet-batch-confirmed":
+      return {
+        type: "success",
+        title: "Wallet batch confirmed",
+        message: `${label}: the user-paid batch confirmed on ${chainName}.`,
+        stage: "confirmed",
+        txHash: status.transactionHash,
+        chainId: status.chainId,
+        autoHide: false,
+      };
     case "sent":
       return {
         type: "success",
@@ -87,6 +105,14 @@ export function getExecutionStatusNotification(
         message:
           "Your source transaction is confirmed. Waiting for the destination asset before refreshing Uniswap v4 calldata…",
         stage: "confirmed",
+        ...inProgress,
+      };
+    case "refreshing-destination":
+      return {
+        type: "info",
+        title: "Bridge settled",
+        message: `${label}: LI.FI delivered the bridge asset. Refreshing the Robinhood Uniswap v4 calls…`,
+        stage: "initiated",
         ...inProgress,
       };
     default:

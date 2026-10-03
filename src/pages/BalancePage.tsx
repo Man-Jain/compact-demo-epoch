@@ -35,6 +35,7 @@ import {
 import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
 import { createQuoteRequestGate } from "../utils/quote-request-gate";
 import { canRequestQuote } from "../utils/quote-eligibility";
+import { requireDeferredV4Execution } from "../utils/deferred-v4-execution";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -521,6 +522,11 @@ export default function BalancePage() {
         routingAndLiquidityOptions,
       });
 
+      const deferredV4Execution =
+        dexRoute === "automatic-v3"
+          ? undefined
+          : requireDeferredV4Execution(result);
+
       if (!quoteRequestGateRef.current.isCurrent(requestId)) return;
 
       setQuoteResult(result);
@@ -528,7 +534,9 @@ export default function BalancePage() {
       showNotification({
         type: "success",
         title: "Quote Retrieved",
-        message: `Expected output: ${result.tokenOut ?? "—"} (raw)`,
+        message: deferredV4Execution
+          ? `Expected output: ${result.tokenOut ?? "—"} (raw). After LI.FI settles, sign ${deferredV4Execution.transactionCount} Robinhood transaction(s) on chain ${deferredV4Execution.chainId}.`
+          : `Expected output: ${result.tokenOut ?? "—"} (raw)`,
         chainId,
         autoHide: true,
       });
@@ -621,6 +629,10 @@ export default function BalancePage() {
         return;
       }
 
+      if (dexRoute !== "automatic-v3") {
+        requireDeferredV4Execution(quoteResult);
+      }
+
       const useGasless = effectiveAllowGasless && gasless;
       if (useGasless && gaslessWallet.needsEpochSetup) {
         showNotification({
@@ -658,6 +670,8 @@ export default function BalancePage() {
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
+        batchMode: "auto",
+        allowSequentialFallback: true,
         allowGaslessSmartAccount: useGasless,
         gasless: useGasless,
       };
@@ -681,6 +695,7 @@ export default function BalancePage() {
         title: "Action Failed",
         message: error instanceof Error ? error.message : "Failed to submit",
         chainId,
+        txHash: EXECUTION_STATUS_NOTIFICATION_ID,
       });
     }
   };
@@ -1172,14 +1187,17 @@ export default function BalancePage() {
                             quoteResult.externalExecution.sourceTransactions
                               .length
                           }{" "}
-                          source transaction(s) on chain{" "}
-                          {quoteResult.externalExecution.sourceChainId}; the
-                          destination v4 calldata is refreshed after external
-                          settlement.
+                          source call(s) on chain{" "}
+                          {quoteResult.externalExecution.sourceChainId}. Your
+                          wallet will offer one user-paid atomic batch when it
+                          supports EIP-5792; otherwise it asks for paid calls
+                          sequentially. The destination v4 calldata is refreshed
+                          only after bridge settlement.
                         </div>
                         {quoteResult.externalExecution.destinationSwap && (
                           <div className="mt-1">
-                            Then sign{" "}
+                            Then the wallet will offer a separate user-paid
+                            batch for{" "}
                             {
                               quoteResult.externalExecution.destinationSwap
                                 .executionTransactions.length
