@@ -46,7 +46,7 @@ import {
   getDexRouteTestConfig,
   getDexTestTokens,
   getSodaxDefaultToken,
-  getSodaxSuggestedTokens,
+  getSodaxSelectableTokens,
   type DexRouteId,
   type ExternalProviderSelection,
 } from "../config/dex-pools";
@@ -225,26 +225,23 @@ export default function BalancePage() {
       (token) => token.address.toLowerCase() !== zeroAddress,
     );
   }, [destinationChainId]);
-  const inputTokenSuggestions = useMemo(
-    () => [
-      ...erc20Tokens,
-      ...getDexTestTokens(chainId),
-      ...(externalProvider === "sodax" ? getSodaxSuggestedTokens(chainId) : []),
-    ],
-    [chainId, erc20Tokens, externalProvider],
-  );
-  const outputTokenSuggestions = useMemo(
-    () => [
+  const inputTokenSuggestions = useMemo(() => {
+    const fallback = [...erc20Tokens, ...getDexTestTokens(chainId)];
+    return externalProvider === "sodax"
+      ? getSodaxSelectableTokens(chainId, fallback)
+      : fallback;
+  }, [chainId, erc20Tokens, externalProvider]);
+  const outputTokenSuggestions = useMemo(() => {
+    const fallback = [
       ...outputTokenOptions,
       ...(destinationChainIdNumber
         ? getDexTestTokens(destinationChainIdNumber)
         : []),
-      ...(externalProvider === "sodax" && destinationChainIdNumber
-        ? getSodaxSuggestedTokens(destinationChainIdNumber)
-        : []),
-    ],
-    [destinationChainIdNumber, externalProvider, outputTokenOptions],
-  );
+    ];
+    return externalProvider === "sodax" && destinationChainIdNumber
+      ? getSodaxSelectableTokens(destinationChainIdNumber, fallback)
+      : fallback;
+  }, [destinationChainIdNumber, externalProvider, outputTokenOptions]);
 
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
@@ -272,28 +269,34 @@ export default function BalancePage() {
     setOutputTokenAddress(outputTokenOptions[0].address);
   }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
 
-  // Base WETH is rejected by Sodax before it can construct a cross-chain
-  // route. Replace only that known-invalid demo selection with the verified
-  // Base USDC -> Robinhood USDG pair when the user selects Sodax.
+  // Sodax rejects unsupported assets before it can construct a cross-chain
+  // route. Normalize configured demo chains to the verified pair on selection.
   useEffect(() => {
-    const isBaseWeth =
-      chainId === 8453 &&
-      depositTokenAddress.toLowerCase() ===
-        "0x4200000000000000000000000000000000000006";
-    if (externalProvider !== "sodax" || !isBaseWeth) return;
+    if (externalProvider !== "sodax") return;
 
     const input = getSodaxDefaultToken(chainId);
-    if (input) setDepositTokenAddress(input.address);
+    if (
+      input &&
+      depositTokenAddress.toLowerCase() !== input.address.toLowerCase()
+    ) {
+      setDepositTokenAddress(input.address);
+    }
 
-    if (destinationChainIdNumber === 4663) {
+    if (destinationChainIdNumber) {
       const output = getSodaxDefaultToken(destinationChainIdNumber);
-      if (output) setOutputTokenAddress(output.address);
+      if (
+        output &&
+        outputTokenAddress.toLowerCase() !== output.address.toLowerCase()
+      ) {
+        setOutputTokenAddress(output.address);
+      }
     }
   }, [
     chainId,
     depositTokenAddress,
     destinationChainIdNumber,
     externalProvider,
+    outputTokenAddress,
   ]);
 
   useEffect(() => {

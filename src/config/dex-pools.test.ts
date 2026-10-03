@@ -4,6 +4,7 @@ import {
   buildDexRouteExtraData,
   EXTERNAL_PROVIDER_OPTIONS,
   getSodaxDefaultToken,
+  getSodaxSelectableTokens,
   getSodaxSuggestedTokens,
 } from "./dex-pools.ts";
 
@@ -42,6 +43,24 @@ test("uses Base USDC as the known-good default for the Sodax demo", () => {
     decimals: 6,
   });
   assert.equal(getSodaxDefaultToken(1), undefined);
+});
+
+test("restricts configured Sodax demo chains to verified selectable tokens", () => {
+  const fallback = [
+    {
+      symbol: "DAI",
+      address: "0x0000000000000000000000000000000000000001",
+      decimals: 18,
+    },
+  ];
+  assert.deepEqual(getSodaxSelectableTokens(8453, fallback), [
+    {
+      symbol: "USDC",
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      decimals: 6,
+    },
+  ]);
+  assert.deepEqual(getSodaxSelectableTokens(1, fallback), fallback);
 });
 
 test("signs a selected external provider without a preferred DEX pool", () => {

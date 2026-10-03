@@ -102,6 +102,18 @@ export function getSodaxDefaultToken(chainId: number): TokenInfo | undefined {
   return getSodaxSuggestedTokens(chainId)[0];
 }
 
+/**
+ * On configured demo chains, selecting Sodax must not expose arbitrary graph
+ * assets: Sodax rejects unsupported assets before it can quote a route.
+ */
+export function getSodaxSelectableTokens(
+  chainId: number,
+  fallback: readonly TokenInfo[],
+): TokenInfo[] {
+  const verified = getSodaxSuggestedTokens(chainId);
+  return verified.length > 0 ? [...verified] : [...fallback];
+}
+
 const BASE_SEPOLIA_HOOKED_POOL: UniswapV4PoolPreference = {
   protocol: "uniswap-v4",
   chainId: 84532,
