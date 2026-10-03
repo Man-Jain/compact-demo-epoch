@@ -18,21 +18,32 @@ test("lists every external solver that can be selected in a signed intent", () =
   );
 });
 
-test("lists the verified Sodax USDC and USDG token suggestions", () => {
-  assert.deepEqual(getSodaxSuggestedTokens(8453), [
-    {
-      symbol: "USDC",
-      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      decimals: 6,
-    },
-  ]);
-  assert.deepEqual(getSodaxSuggestedTokens(4663), [
-    {
-      symbol: "USDG",
-      address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
-      decimals: 6,
-    },
-  ]);
+test("lists the full live-registry ERC20 snapshot for Base and Robinhood", () => {
+  const base = getSodaxSuggestedTokens(8453);
+  assert.equal(base.length, 10);
+  assert.deepEqual(
+    base.map((token) => token.symbol),
+    [
+      "weETH",
+      "USDC",
+      "sUSDS",
+      "wstETH",
+      "cbBTC",
+      "VIRTUAL",
+      "cbETH",
+      "SODA",
+      "EURC",
+      "MORPHO",
+    ],
+  );
+
+  const robinhood = getSodaxSuggestedTokens(4663);
+  assert.equal(robinhood.length, 28);
+  assert.deepEqual(
+    robinhood.slice(0, 5).map((token) => token.symbol),
+    ["bnUSD", "SODA", "USDG", "SPCX", "NVDA"],
+  );
+  assert.ok(robinhood.some((token) => token.symbol === "BABA"));
   assert.deepEqual(getSodaxSuggestedTokens(1), []);
 });
 
@@ -53,13 +64,9 @@ test("restricts configured Sodax demo chains to verified selectable tokens", () 
       decimals: 18,
     },
   ];
-  assert.deepEqual(getSodaxSelectableTokens(8453, fallback), [
-    {
-      symbol: "USDC",
-      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      decimals: 6,
-    },
-  ]);
+  const base = getSodaxSelectableTokens(8453, fallback);
+  assert.equal(base.length, 10);
+  assert.equal(base[0].symbol, "weETH");
   assert.deepEqual(getSodaxSelectableTokens(1, fallback), fallback);
 });
 
