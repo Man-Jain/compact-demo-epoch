@@ -1,4 +1,5 @@
 import {
+  mainnet,
   arbitrum,
   base,
   baseSepolia,
@@ -9,7 +10,7 @@ import {
 } from "viem/chains";
 
 /** RPC URLs for supported chains (including chains not in wagmi config). */
-const ANKR_API_KEY = import.meta.env.VITE_ANKR_API_KEY;
+const ANKR_API_KEY = import.meta.env?.VITE_ANKR_API_KEY;
 
 function ankrRpc(network: string, fallback: string): string {
   return ANKR_API_KEY
@@ -18,6 +19,7 @@ function ankrRpc(network: string, fallback: string): string {
 }
 
 export const RPC_ENDPOINTS: Record<number, string> = {
+  1: ankrRpc("eth", mainnet.rpcUrls.default.http[0]),
   10: ankrRpc("optimism", optimism.rpcUrls.default.http[0]),
   137: ankrRpc("polygon", polygon.rpcUrls.default.http[0]),
   8453: ankrRpc("base", base.rpcUrls.default.http[0]),
