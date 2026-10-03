@@ -52,11 +52,10 @@ extraData: {
 The actual Compact witness also preserves the demo's legacy
 `uint256 somethingKey` declaration. On submission the SDK:
 
-1. Executes the selected provider's source approvals and intent call.
+1. Asks the wallet to submit source calls as one user-paid EIP-5792 batch when it supports atomic calls for the source chain; otherwise it uses paid sequential calls.
 2. Waits for the external bridge or solver to settle.
-3. Refreshes the destination v4 quote and router deadline.
-4. Switches to the destination chain and asks the wallet to sign the bounded
-   Permit2 approvals and Universal Router swap.
+3. Refreshes the destination v4 quote and router deadline using the delivered amount.
+4. Asks the wallet for a separate user-paid destination-chain batch for the bounded Permit2 approvals and Universal Router swap. Cross-chain calls are never bundled together.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
