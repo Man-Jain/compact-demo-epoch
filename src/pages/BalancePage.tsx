@@ -44,8 +44,10 @@ import {
   buildDexRouteExtraData,
   DEX_ROUTE_OPTIONS,
   EXTERNAL_PROVIDER_OPTIONS,
+  getDexRouteForOutputToken,
   getDexRouteTestConfig,
   getDexTestTokens,
+  getFixedV4DestinationTokens,
   getSodaxDefaultToken,
   getSodaxSelectableTokens,
   type DexRouteId,
@@ -234,15 +236,27 @@ export default function BalancePage() {
       : fallback;
   }, [chainId, erc20Tokens, externalProvider]);
   const outputTokenSuggestions = useMemo(() => {
+    const fixedRouteTokens = destinationChainIdNumber
+      ? getFixedV4DestinationTokens(destinationChainIdNumber)
+      : [];
     const fallback = [
       ...outputTokenOptions,
       ...(destinationChainIdNumber
         ? getDexTestTokens(destinationChainIdNumber)
         : []),
+      ...fixedRouteTokens,
     ];
-    return externalProvider === "sodax" && destinationChainIdNumber
-      ? getSodaxSelectableTokens(destinationChainIdNumber, fallback)
-      : fallback;
+    const candidates =
+      externalProvider === "sodax" && destinationChainIdNumber
+        ? getSodaxSelectableTokens(destinationChainIdNumber, fallback)
+        : fallback;
+    return candidates.filter(
+      (token, index) =>
+        candidates.findIndex(
+          (candidate) =>
+            candidate.address.toLowerCase() === token.address.toLowerCase(),
+        ) === index,
+    );
   }, [destinationChainIdNumber, externalProvider, outputTokenOptions]);
 
   const prevSourceChainRef = useRef<number | null>(null);
@@ -299,6 +313,33 @@ export default function BalancePage() {
     destinationChainIdNumber,
     externalProvider,
     outputTokenAddress,
+  ]);
+
+  // PPORT is a configured destination asset rather than an arbitrary token:
+  // choosing it signs the public Robinhood PoolKey and pins LI.FI for the bridge.
+  useEffect(() => {
+    if (!destinationChainIdNumber || !outputTokenAddress) return;
+    const selectedRoute = getDexRouteForOutputToken(
+      destinationChainIdNumber,
+      outputTokenAddress,
+    );
+    if (selectedRoute) {
+      if (dexRoute !== selectedRoute) setDexRoute(selectedRoute);
+      if (externalProvider !== "lifi") setExternalProvider("lifi");
+      if (routingPreset !== "external-multi-transactions") {
+        setRoutingPreset("external-multi-transactions");
+      }
+      return;
+    }
+    if (dexRoute === "robinhood-weth-pport-v4") {
+      setDexRoute("automatic-v3");
+    }
+  }, [
+    destinationChainIdNumber,
+    dexRoute,
+    externalProvider,
+    outputTokenAddress,
+    routingPreset,
   ]);
 
   useEffect(() => {
@@ -1038,10 +1079,15 @@ export default function BalancePage() {
                     onChange={(event) => {
                       const nextRoute = event.target.value as DexRouteId;
                       setDexRoute(nextRoute);
-                      if (nextRoute === "ethereum-mainnet-stablepair-v4") {
+                      const nextTestConfig = getDexRouteTestConfig(nextRoute);
+                      if (nextTestConfig?.requiredProvider) {
+                        setExternalProvider(nextTestConfig.requiredProvider);
+                        setRoutingPreset("external-multi-transactions");
+                      } else if (
+                        nextRoute === "ethereum-mainnet-stablepair-v4"
+                      ) {
                         setRoutingPreset("external-multi-transactions");
                       }
-                      const nextTestConfig = getDexRouteTestConfig(nextRoute);
                       if (nextTestConfig) {
                         setDestinationChainId(
                           nextTestConfig.destinationChainId.toString(),
@@ -1208,14 +1254,22 @@ export default function BalancePage() {
                   disabled={!canFetchQuote || isLoadingQuote || isConfirming}
                   className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoadingQuote ? "Loading Quote..." : "Get Quote"}
+                  {isLoadingQuote
+                    ? "Loading Quote..."
+                    : dexRoute === "robinhood-weth-pport-v4"
+                      ? "Get LI.FI + PPORT Quote"
+                      : "Get Quote"}
                 </button>
                 <button
                   onClick={onSubmit}
                   disabled={!isFormValid || isConfirming}
                   className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
+                  {isConfirming
+                    ? "Executing..."
+                    : dexRoute === "robinhood-weth-pport-v4"
+                      ? "Execute LI.FI + PPORT Route"
+                      : "Deposit + Submit Intent"}
                 </button>
               </div>
               {!canFetchQuote && (

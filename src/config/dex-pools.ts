@@ -9,7 +9,10 @@ import {
 import type { TokenInfo } from "./web3";
 
 export type DexRouteId =
-  "automatic-v3" | "base-sepolia-hooked-v4" | "ethereum-mainnet-stablepair-v4";
+  | "automatic-v3"
+  | "base-sepolia-hooked-v4"
+  | "ethereum-mainnet-stablepair-v4"
+  | "robinhood-weth-pport-v4";
 
 export type ExternalProviderSelection = "any" | ExternalQuoteProvider;
 
@@ -26,7 +29,7 @@ export const EXTERNAL_PROVIDER_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "any", label: "Any enabled provider" },
-  ...EXTERNAL_QUOTE_PROVIDERS.map((id) => ({
+  ...EXTERNAL_QUOTE_PROVIDERS.filter((id) => id !== "sodax").map((id) => ({
     id,
     label: EXTERNAL_PROVIDER_LABELS[id],
   })),
@@ -53,6 +56,12 @@ export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
     label: "Ethereum mainnet USDC/USDT Uniswap v4",
     description:
       "Test the external bridge plus Uniswap v4 flow against Uniswap's public StablePairHook pool on Ethereum.",
+  },
+  {
+    id: "robinhood-weth-pport-v4",
+    label: "Robinhood WETH/PPORT Uniswap v4",
+    description:
+      "LI.FI bridges into Robinhood WETH, then the selected v4 PoolKey swaps WETH to PPORT.",
   },
 ];
 
@@ -325,6 +334,19 @@ const BASE_SEPOLIA_HOOKED_POOL: UniswapV4PoolPreference = {
  * deployment and initialized USDC/USDT PoolKey are published by Uniswap:
  * https://github.com/Uniswap/v4-hooks-public#stablepairhook
  */
+const ROBINHOOD_WETH_PPORT_POOL: UniswapV4PoolPreference = {
+  protocol: "uniswap-v4",
+  chainId: 4663,
+  poolKey: {
+    currency0: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    currency1: "0x52090044B98bacBA07693B464E11Cbdf69313351",
+    fee: 3000,
+    tickSpacing: 60,
+    hooks: "0x32f5a629b9B829963C4D885d0d1eDaaAB8d48a80",
+  },
+  hookData: "0x",
+};
+
 const ETHEREUM_MAINNET_STABLEPAIR_POOL: UniswapV4PoolPreference = {
   protocol: "uniswap-v4",
   chainId: 1,
@@ -346,6 +368,8 @@ type FixedV4Route = {
   tokenIn: TokenInfo;
   tokenOut: TokenInfo;
   testingInstructions: string;
+  requiredProvider?: ExternalQuoteProvider;
+  autoSelectForOutput?: boolean;
 };
 
 const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
@@ -373,6 +397,24 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
     testingInstructions:
       "Mainnet test: switch your wallet to Ethereum (1). This route uses the External — multi-transaction tier; use Get Quote to inspect the external bridge and destination v4 plan before submitting a real intent.",
   },
+  "robinhood-weth-pport-v4": {
+    destinationChainId: 4663,
+    pool: ROBINHOOD_WETH_PPORT_POOL,
+    tokenIn: {
+      symbol: "WETH",
+      address: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+      decimals: 18,
+    },
+    tokenOut: {
+      symbol: "PPORT",
+      address: "0x52090044B98bacBA07693B464E11Cbdf69313351",
+      decimals: 18,
+    },
+    requiredProvider: "lifi",
+    autoSelectForOutput: true,
+    testingInstructions:
+      "Select PPORT to sign the Robinhood WETH/PPORT v4 PoolKey. The route is fixed to LI.FI: it bridges your source token into Robinhood WETH before the destination v4 swap.",
+  },
 };
 
 const DEFAULT_EXTRA_DATA = {
@@ -397,6 +439,30 @@ export function getDexRouteTestConfig(route: DexRouteId): FixedV4Route | null {
   return route === "automatic-v3" ? null : FIXED_V4_ROUTES[route];
 }
 
+/** Destination tokens that select a deliberately configured v4 route. */
+export function getFixedV4DestinationTokens(chainId: number): TokenInfo[] {
+  return Object.values(FIXED_V4_ROUTES)
+    .filter(
+      (route) =>
+        route.destinationChainId === chainId && route.autoSelectForOutput,
+    )
+    .map((route) => route.tokenOut);
+}
+
+/** Returns the configured route selected by an exact destination token choice. */
+export function getDexRouteForOutputToken(
+  destinationChainId: number,
+  tokenAddress: string,
+): DexRouteId | null {
+  const match = Object.entries(FIXED_V4_ROUTES).find(
+    ([, route]) =>
+      route.autoSelectForOutput &&
+      route.destinationChainId === destinationChainId &&
+      sameAddress(route.tokenOut.address, tokenAddress),
+  );
+  return (match?.[0] as FixedV4RouteId | undefined) ?? null;
+}
+
 export function buildDexRouteExtraData(params: {
   route: DexRouteId;
   destinationChainId: number | undefined;
@@ -417,6 +483,13 @@ export function buildDexRouteExtraData(params: {
       : DEFAULT_EXTRA_DATA;
   }
 
+  const selectedProvider = params.provider ?? route.requiredProvider;
+  if (route.requiredProvider && selectedProvider !== route.requiredProvider) {
+    throw new Error(
+      `The selected v4 route requires provider ${route.requiredProvider}.`,
+    );
+  }
+
   const key = route.pool.poolKey;
   // The external provider bridges the source asset to the destination pool.
   // Only the final output must be a currency in that destination PoolKey.
@@ -435,14 +508,14 @@ export function buildDexRouteExtraData(params: {
   return {
     extraDataTypestring: [
       DEFAULT_EXTRA_DATA.extraDataTypestring,
-      params.provider ? EXTERNAL_PROVIDER_EXTRA_TYPESTRING : undefined,
+      selectedProvider ? EXTERNAL_PROVIDER_EXTRA_TYPESTRING : undefined,
       DEX_POOLS_EXTRA_TYPESTRING,
     ]
       .filter((entry): entry is string => Boolean(entry))
       .join(","),
     extraData: {
       ...DEFAULT_EXTRA_DATA.extraData,
-      ...(params.provider ? { provider: params.provider } : {}),
+      ...(selectedProvider ? { provider: selectedProvider } : {}),
       dexPools: encodeDexPools([route.pool]),
     },
   };

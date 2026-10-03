@@ -6,6 +6,8 @@ import {
   getSodaxDefaultToken,
   getSodaxSelectableTokens,
   getSodaxSuggestedTokens,
+  getFixedV4DestinationTokens,
+  getDexRouteForOutputToken,
 } from "./dex-pools.ts";
 
 const BASE_SEPOLIA_USDC = "0x2BB4FfD7E2c6D432b697554Efd77fA13bdbefd69";
@@ -14,7 +16,7 @@ const BASE_SEPOLIA_USDT = "0xc04d2869665Be874881133943523723Be5782720";
 test("lists every external solver that can be selected in a signed intent", () => {
   assert.deepEqual(
     EXTERNAL_PROVIDER_OPTIONS.map((option) => option.id),
-    ["any", "khalani", "near", "lifi", "sodax"],
+    ["any", "khalani", "near", "lifi"],
   );
 });
 
@@ -128,5 +130,46 @@ test("rejects a preferred Ethereum pool when the destination is Robinhood", () =
         tokenOut: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
       }),
     /configured destination chain and token pair/,
+  );
+});
+
+const ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
+const ROBINHOOD_PPORT = "0x52090044B98bacBA07693B464E11Cbdf69313351";
+
+test("selecting PPORT on Robinhood chooses the configured LI.FI-backed v4 route", () => {
+  assert.deepEqual(getFixedV4DestinationTokens(4663), [
+    { symbol: "PPORT", address: ROBINHOOD_PPORT, decimals: 18 },
+  ]);
+  assert.equal(
+    getDexRouteForOutputToken(4663, ROBINHOOD_PPORT),
+    "robinhood-weth-pport-v4",
+  );
+  assert.equal(getDexRouteForOutputToken(4663, ROBINHOOD_WETH), null);
+
+  const result = buildDexRouteExtraData({
+    route: "robinhood-weth-pport-v4",
+    destinationChainId: 4663,
+    tokenIn: BASE_SEPOLIA_USDC,
+    tokenOut: ROBINHOOD_PPORT,
+  });
+  assert.equal(result.extraData.provider, "lifi");
+  assert.equal(
+    result.extraDataTypestring,
+    "uint256 somethingKey,string provider,string dexPools",
+  );
+  assert.equal(typeof result.extraData.dexPools, "string");
+});
+
+test("rejects a non-LI.FI provider for the configured Robinhood PPORT route", () => {
+  assert.throws(
+    () =>
+      buildDexRouteExtraData({
+        route: "robinhood-weth-pport-v4",
+        destinationChainId: 4663,
+        tokenIn: BASE_SEPOLIA_USDC,
+        tokenOut: ROBINHOOD_PPORT,
+        provider: "near",
+      }),
+    /requires provider lifi/,
   );
 });
