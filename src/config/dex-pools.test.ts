@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDexRouteExtraData,
   EXTERNAL_PROVIDER_OPTIONS,
+  getSodaxDefaultToken,
   getSodaxSuggestedTokens,
 } from "./dex-pools.ts";
 
@@ -32,6 +33,15 @@ test("lists the verified Sodax USDC and USDG token suggestions", () => {
     },
   ]);
   assert.deepEqual(getSodaxSuggestedTokens(1), []);
+});
+
+test("uses Base USDC as the known-good default for the Sodax demo", () => {
+  assert.deepEqual(getSodaxDefaultToken(8453), {
+    symbol: "USDC",
+    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    decimals: 6,
+  });
+  assert.equal(getSodaxDefaultToken(1), undefined);
 });
 
 test("signs a selected external provider without a preferred DEX pool", () => {

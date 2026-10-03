@@ -98,6 +98,10 @@ export function getSodaxSuggestedTokens(chainId: number): readonly TokenInfo[] {
   return SODAX_SUGGESTED_TOKENS[chainId] ?? [];
 }
 
+export function getSodaxDefaultToken(chainId: number): TokenInfo | undefined {
+  return getSodaxSuggestedTokens(chainId)[0];
+}
+
 const BASE_SEPOLIA_HOOKED_POOL: UniswapV4PoolPreference = {
   protocol: "uniswap-v4",
   chainId: 84532,

@@ -45,6 +45,7 @@ import {
   EXTERNAL_PROVIDER_OPTIONS,
   getDexRouteTestConfig,
   getDexTestTokens,
+  getSodaxDefaultToken,
   getSodaxSuggestedTokens,
   type DexRouteId,
   type ExternalProviderSelection,
@@ -270,6 +271,30 @@ export default function BalancePage() {
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
   }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
+
+  // Base WETH is rejected by Sodax before it can construct a cross-chain
+  // route. Replace only that known-invalid demo selection with the verified
+  // Base USDC -> Robinhood USDG pair when the user selects Sodax.
+  useEffect(() => {
+    const isBaseWeth =
+      chainId === 8453 &&
+      depositTokenAddress.toLowerCase() ===
+        "0x4200000000000000000000000000000000000006";
+    if (externalProvider !== "sodax" || !isBaseWeth) return;
+
+    const input = getSodaxDefaultToken(chainId);
+    if (input) setDepositTokenAddress(input.address);
+
+    if (destinationChainIdNumber === 4663) {
+      const output = getSodaxDefaultToken(destinationChainIdNumber);
+      if (output) setOutputTokenAddress(output.address);
+    }
+  }, [
+    chainId,
+    depositTokenAddress,
+    destinationChainIdNumber,
+    externalProvider,
+  ]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
