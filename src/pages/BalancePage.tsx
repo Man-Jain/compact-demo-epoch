@@ -33,6 +33,7 @@ import {
   getExecutionStatusNotification,
 } from "../utils/executionStatusNotifications";
 import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
+import { createQuoteRequestGate } from "../utils/quote-request-gate";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -164,6 +165,7 @@ export default function BalancePage() {
     null,
   );
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const quoteRequestGateRef = useRef(createQuoteRequestGate());
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
   const [externalProvider, setExternalProvider] =
@@ -443,8 +445,25 @@ export default function BalancePage() {
     customSolverAddresses,
   ]);
 
+  useEffect(() => {
+    quoteRequestGateRef.current.invalidate();
+  }, [
+    chainId,
+    customSolverAddresses,
+    depositTokenAddress,
+    destinationChainId,
+    dexRoute,
+    externalProvider,
+    inputAmountDisplay,
+    outputAmount,
+    outputTokenAddress,
+    routingPreset,
+    tokenType,
+  ]);
+
   const fetchIntentQuote = async () => {
     if (!canFetchQuote) return;
+    const requestId = quoteRequestGateRef.current.begin();
     setIsLoadingQuote(true);
     setQuoteResult(null);
     try {
@@ -490,6 +509,8 @@ export default function BalancePage() {
         routingAndLiquidityOptions,
       });
 
+      if (!quoteRequestGateRef.current.isCurrent(requestId)) return;
+
       setQuoteResult(result);
 
       showNotification({
@@ -500,6 +521,8 @@ export default function BalancePage() {
         autoHide: true,
       });
     } catch (error) {
+      if (!quoteRequestGateRef.current.isCurrent(requestId)) return;
+
       showNotification({
         type: "error",
         title: "Quote Failed",
@@ -507,7 +530,9 @@ export default function BalancePage() {
         chainId,
       });
     } finally {
-      setIsLoadingQuote(false);
+      if (quoteRequestGateRef.current.isCurrent(requestId)) {
+        setIsLoadingQuote(false);
+      }
     }
   };
 
