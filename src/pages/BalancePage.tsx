@@ -316,8 +316,8 @@ export default function BalancePage() {
     outputTokenAddress,
   ]);
 
-  // PPORT is a configured destination asset rather than an arbitrary token:
-  // choosing it signs the public Robinhood PoolKey and pins LI.FI for the bridge.
+  // Configured destination assets sign their public Robinhood PoolKeys and pin
+  // LI.FI for the bridge leg.
   useEffect(() => {
     if (!destinationChainIdNumber || !outputTokenAddress) return;
     const selectedRoute = getDexRouteForOutputToken(
@@ -332,12 +332,13 @@ export default function BalancePage() {
       }
       return;
     }
-    if (dexRoute === "robinhood-weth-pport-v4") {
+    if (dexRouteTestConfig?.autoSelectForOutput) {
       setDexRoute("automatic-v3");
     }
   }, [
     destinationChainIdNumber,
     dexRoute,
+    dexRouteTestConfig,
     externalProvider,
     outputTokenAddress,
     routingPreset,
@@ -1265,7 +1266,9 @@ export default function BalancePage() {
                     ? "Loading Quote..."
                     : dexRoute === "robinhood-weth-pport-v4"
                       ? "Get LI.FI + PPORT Quote"
-                      : "Get Quote"}
+                      : dexRoute === "robinhood-ai-usdg-v4"
+                        ? "Get LI.FI + AI Quote"
+                        : "Get Quote"}
                 </button>
                 <button
                   onClick={onSubmit}
@@ -1276,7 +1279,9 @@ export default function BalancePage() {
                     ? "Executing..."
                     : dexRoute === "robinhood-weth-pport-v4"
                       ? "Execute LI.FI + PPORT Route"
-                      : "Deposit + Submit Intent"}
+                      : dexRoute === "robinhood-ai-usdg-v4"
+                        ? "Execute LI.FI + AI Route"
+                        : "Deposit + Submit Intent"}
                 </button>
               </div>
               {!canFetchQuote && (

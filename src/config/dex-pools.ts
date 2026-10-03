@@ -12,7 +12,8 @@ export type DexRouteId =
   | "automatic-v3"
   | "base-sepolia-hooked-v4"
   | "ethereum-mainnet-stablepair-v4"
-  | "robinhood-weth-pport-v4";
+  | "robinhood-weth-pport-v4"
+  | "robinhood-ai-usdg-v4";
 
 export type ExternalProviderSelection = "any" | ExternalQuoteProvider;
 
@@ -62,6 +63,12 @@ export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
     label: "Robinhood WETH/PPORT Uniswap v4",
     description:
       "LI.FI bridges into Robinhood WETH, then the selected v4 PoolKey swaps WETH to PPORT.",
+  },
+  {
+    id: "robinhood-ai-usdg-v4",
+    label: "Robinhood AI/USDG Uniswap v4 (FablesRamp)",
+    description:
+      "LI.FI bridges into Robinhood USDG, then the selected FablesRamp v4 PoolKey swaps USDG to AI.",
   },
 ];
 
@@ -347,6 +354,24 @@ const ROBINHOOD_WETH_PPORT_POOL: UniswapV4PoolPreference = {
   hookData: "0x",
 };
 
+/**
+ * Public Robinhood v4 AI/USDG FablesRamp pool. The PoolKey was verified from
+ * the PoolManager Initialize event for pool id
+ * 0x592e3fb7ea947506b36481025abc15baada8e1839a50fded46ecf08b3182fa96.
+ */
+const ROBINHOOD_AI_USDG_POOL: UniswapV4PoolPreference = {
+  protocol: "uniswap-v4",
+  chainId: 4663,
+  poolKey: {
+    currency0: "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18",
+    currency1: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+    fee: 0x800000,
+    tickSpacing: 60,
+    hooks: "0x08E52564Bad99E05a694B4809F397eDCA417A080",
+  },
+  hookData: "0x",
+};
+
 const ETHEREUM_MAINNET_STABLEPAIR_POOL: UniswapV4PoolPreference = {
   protocol: "uniswap-v4",
   chainId: 1,
@@ -414,6 +439,24 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
     autoSelectForOutput: true,
     testingInstructions:
       "Select PPORT to sign the Robinhood WETH/PPORT v4 PoolKey. The route is fixed to LI.FI: it bridges your source token into Robinhood WETH before the destination v4 swap.",
+  },
+  "robinhood-ai-usdg-v4": {
+    destinationChainId: 4663,
+    pool: ROBINHOOD_AI_USDG_POOL,
+    tokenIn: {
+      symbol: "USDG",
+      address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      decimals: 6,
+    },
+    tokenOut: {
+      symbol: "AI",
+      address: "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18",
+      decimals: 18,
+    },
+    requiredProvider: "lifi",
+    autoSelectForOutput: true,
+    testingInstructions:
+      "Select AI to sign the live Robinhood AI/USDG FablesRamp v4 PoolKey. LI.FI bridges the source token into Robinhood USDG, then the destination swap spends USDG for AI. The route was read-only quoted successfully from Base USDC before being added here.",
   },
 };
 

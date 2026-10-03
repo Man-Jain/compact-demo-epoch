@@ -135,10 +135,12 @@ test("rejects a preferred Ethereum pool when the destination is Robinhood", () =
 
 const ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
 const ROBINHOOD_PPORT = "0x52090044B98bacBA07693B464E11Cbdf69313351";
+const ROBINHOOD_AI = "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18";
 
 test("selecting PPORT on Robinhood chooses the configured LI.FI-backed v4 route", () => {
   assert.deepEqual(getFixedV4DestinationTokens(4663), [
     { symbol: "PPORT", address: ROBINHOOD_PPORT, decimals: 18 },
+    { symbol: "AI", address: ROBINHOOD_AI, decimals: 18 },
   ]);
   assert.equal(
     getDexRouteForOutputToken(4663, ROBINHOOD_PPORT),
@@ -158,6 +160,35 @@ test("selecting PPORT on Robinhood chooses the configured LI.FI-backed v4 route"
     "uint256 somethingKey,string provider,string dexPools",
   );
   assert.equal(typeof result.extraData.dexPools, "string");
+});
+
+test("selecting Robinhood AI signs the verified LI.FI-backed FablesRamp v4 route", () => {
+  assert.equal(
+    getDexRouteForOutputToken(4663, ROBINHOOD_AI),
+    "robinhood-ai-usdg-v4",
+  );
+
+  const result = buildDexRouteExtraData({
+    route: "robinhood-ai-usdg-v4",
+    destinationChainId: 4663,
+    tokenIn: BASE_SEPOLIA_USDC,
+    tokenOut: ROBINHOOD_AI,
+  });
+
+  assert.equal(result.extraData.provider, "lifi");
+  assert.equal(typeof result.extraData.dexPools, "string");
+  const [pool] = JSON.parse(result.extraData.dexPools!);
+  assert.deepEqual(pool.poolKey, {
+    currency0: ROBINHOOD_AI.toLowerCase(),
+    currency1: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168".toLowerCase(),
+    fee: 0x800000,
+    tickSpacing: 60,
+    hooks: "0x08E52564Bad99E05a694B4809F397eDCA417A080".toLowerCase(),
+  });
+  assert.equal(
+    result.extraDataTypestring,
+    "uint256 somethingKey,string provider,string dexPools",
+  );
 });
 
 test("rejects a non-LI.FI provider for the configured Robinhood PPORT route", () => {
