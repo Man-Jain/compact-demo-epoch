@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDexRouteExtraData,
   EXTERNAL_PROVIDER_OPTIONS,
+  getSodaxSuggestedTokens,
 } from "./dex-pools.ts";
 
 const BASE_SEPOLIA_USDC = "0x2BB4FfD7E2c6D432b697554Efd77fA13bdbefd69";
@@ -13,6 +14,24 @@ test("lists every external solver that can be selected in a signed intent", () =
     EXTERNAL_PROVIDER_OPTIONS.map((option) => option.id),
     ["any", "khalani", "near", "lifi", "sodax"],
   );
+});
+
+test("lists the verified Sodax USDC and USDG token suggestions", () => {
+  assert.deepEqual(getSodaxSuggestedTokens(8453), [
+    {
+      symbol: "USDC",
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      decimals: 6,
+    },
+  ]);
+  assert.deepEqual(getSodaxSuggestedTokens(4663), [
+    {
+      symbol: "USDG",
+      address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      decimals: 6,
+    },
+  ]);
+  assert.deepEqual(getSodaxSuggestedTokens(1), []);
 });
 
 test("signs a selected external provider without a preferred DEX pool", () => {

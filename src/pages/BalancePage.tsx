@@ -45,6 +45,7 @@ import {
   EXTERNAL_PROVIDER_OPTIONS,
   getDexRouteTestConfig,
   getDexTestTokens,
+  getSodaxSuggestedTokens,
   type DexRouteId,
   type ExternalProviderSelection,
 } from "../config/dex-pools";
@@ -224,8 +225,12 @@ export default function BalancePage() {
     );
   }, [destinationChainId]);
   const inputTokenSuggestions = useMemo(
-    () => [...erc20Tokens, ...getDexTestTokens(chainId)],
-    [chainId, erc20Tokens],
+    () => [
+      ...erc20Tokens,
+      ...getDexTestTokens(chainId),
+      ...(externalProvider === "sodax" ? getSodaxSuggestedTokens(chainId) : []),
+    ],
+    [chainId, erc20Tokens, externalProvider],
   );
   const outputTokenSuggestions = useMemo(
     () => [
@@ -233,8 +238,11 @@ export default function BalancePage() {
       ...(destinationChainIdNumber
         ? getDexTestTokens(destinationChainIdNumber)
         : []),
+      ...(externalProvider === "sodax" && destinationChainIdNumber
+        ? getSodaxSuggestedTokens(destinationChainIdNumber)
+        : []),
     ],
-    [destinationChainIdNumber, outputTokenOptions],
+    [destinationChainIdNumber, externalProvider, outputTokenOptions],
   );
 
   const prevSourceChainRef = useRef<number | null>(null);

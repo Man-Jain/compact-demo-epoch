@@ -76,6 +76,28 @@ export function getDexTestTokens(chainId: number): readonly TokenInfo[] {
   return DUMMY_LENDING_CHAIN_IDS.has(chainId) ? DUMMY_LENDING_TOKENS : [];
 }
 
+/** Verified live Sodax assets for the Base-to-Robinhood demo route. */
+const SODAX_SUGGESTED_TOKENS: Readonly<Record<number, readonly TokenInfo[]>> = {
+  8453: [
+    {
+      symbol: "USDC",
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      decimals: 6,
+    },
+  ],
+  4663: [
+    {
+      symbol: "USDG",
+      address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      decimals: 6,
+    },
+  ],
+};
+
+export function getSodaxSuggestedTokens(chainId: number): readonly TokenInfo[] {
+  return SODAX_SUGGESTED_TOKENS[chainId] ?? [];
+}
+
 const BASE_SEPOLIA_HOOKED_POOL: UniswapV4PoolPreference = {
   protocol: "uniswap-v4",
   chainId: 84532,
