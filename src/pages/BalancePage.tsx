@@ -34,6 +34,7 @@ import {
 } from "../utils/executionStatusNotifications";
 import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
 import { createQuoteRequestGate } from "../utils/quote-request-gate";
+import { canRequestQuote } from "../utils/quote-eligibility";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -449,28 +450,29 @@ export default function BalancePage() {
   ]);
 
   const canFetchQuote = useMemo(() => {
-    if (!walletClient || !address || !allocatorAddress) return false;
-    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
-    if (!outputAmount || isNaN(Number(outputAmount))) return false;
-    if (
-      routingPreset === "custom" &&
-      !isValidCustomSolverInput(customSolverAddresses)
-    ) {
-      return false;
-    }
-    if (tokenType === "erc20") {
-      if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
-        return false;
-      if (!depositChecksumAddress || !isValidDeposit || isLoadingDeposit)
-        return false;
-      if (outputDecimals === undefined) return false;
-      if (depositDecimals === undefined) return false;
-    }
-    return true;
+    return canRequestQuote({
+      connected: isConnected,
+      address,
+      allocatorAddress,
+      sourceChainId: chainId,
+      inputAmount: inputAmountDisplay,
+      outputAmount,
+      tokenType,
+      outputResolved:
+        Boolean(outputChecksumAddress) && isValidOutput && !isLoadingOutput,
+      depositResolved:
+        Boolean(depositChecksumAddress) && isValidDeposit && !isLoadingDeposit,
+      outputDecimals,
+      depositDecimals,
+      customRoutingValid:
+        routingPreset !== "custom" ||
+        isValidCustomSolverInput(customSolverAddresses),
+    });
   }, [
-    walletClient,
+    isConnected,
     address,
     allocatorAddress,
+    chainId,
     inputAmountDisplay,
     outputAmount,
     tokenType,
@@ -517,9 +519,14 @@ export default function BalancePage() {
         tokenOut: outputChecksumAddress!,
         ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
+      // Quote construction only reads the active chain id. Some injected
+      // wallets briefly expose account/chain state before wagmi resolves its
+      // WalletClient, so retain quote availability during that transition.
+      const quoteWalletClient =
+        walletClient ?? ({ chain: { id: chainId } } as any);
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
-        walletClient: walletClient as any,
+        walletClient: quoteWalletClient as any,
       });
 
       const { taskTypeString, intentData } = await epochSdk.getTaskData({
@@ -1262,7 +1269,7 @@ export default function BalancePage() {
                 </button>
                 <button
                   onClick={onSubmit}
-                  disabled={!isFormValid || isConfirming}
+                  disabled={!isFormValid || !walletClient || isConfirming}
                   className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isConfirming
