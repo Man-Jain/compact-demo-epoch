@@ -670,8 +670,12 @@ export default function BalancePage() {
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
-        batchMode: "auto",
-        allowSequentialFallback: true,
+        // A selected v4 PoolKey needs the bridge and the destination swap to
+        // remain explicit stages. Each stage is still an atomic, user-paid
+        // EIP-5792 bundle; do not silently downgrade this demo flow to a
+        // series of independent approvals and swaps.
+        batchMode: dexRoute === "automatic-v3" ? "auto" : "wallet",
+        allowSequentialFallback: dexRoute === "automatic-v3",
         allowGaslessSmartAccount: useGasless,
         gasless: useGasless,
       };
@@ -1189,10 +1193,11 @@ export default function BalancePage() {
                           }{" "}
                           source call(s) on chain{" "}
                           {quoteResult.externalExecution.sourceChainId}. Your
-                          wallet will offer one user-paid atomic batch when it
-                          supports EIP-5792; otherwise it asks for paid calls
-                          sequentially. The destination v4 calldata is refreshed
-                          only after bridge settlement.
+                          wallet will offer one user-paid atomic batch through
+                          EIP-5792. If the wallet cannot support atomic calls,
+                          this v4 route stops before submitting calls. The
+                          destination v4 calldata is refreshed only after bridge
+                          settlement.
                         </div>
                         {quoteResult.externalExecution.destinationSwap && (
                           <div className="mt-1">

@@ -52,10 +52,17 @@ extraData: {
 The actual Compact witness also preserves the demo's legacy
 `uint256 somethingKey` declaration. On submission the SDK:
 
-1. Asks the wallet to submit source calls as one user-paid EIP-5792 batch when it supports atomic calls for the source chain; otherwise it uses paid sequential calls.
+1. For a selected v4 PoolKey, requires one user-paid EIP-5792 atomic batch for the source-chain calls. MetaMask may offer a smart-account upgrade when it reports atomic capability status `ready`.
 2. Waits for the external bridge or solver to settle.
 3. Refreshes the destination v4 quote and router deadline using the delivered amount.
-4. Asks the wallet for a separate user-paid destination-chain batch for the bounded Permit2 approvals and Universal Router swap. Cross-chain calls are never bundled together.
+4. Requests a wallet network switch to the destination chain, then asks for a separate user-paid atomic destination-chain batch for the bounded Permit2 approvals and Universal Router swap. Cross-chain calls are never bundled together.
+
+The external solver derives the LI.FI bridge asset from the signed PoolKey. For
+the Robinhood AI/USDG FablesRamp pool, selecting AI makes USDG the required
+bridge asset: LI.FI bridges the source asset to Robinhood USDG, then the
+refreshed v4 swap converts USDG to AI. The frontend signs the final output
+token, destination chain, provider, and complete `PoolKey`; it does not produce
+or trust destination router calldata.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
