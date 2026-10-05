@@ -36,6 +36,7 @@ import { createSolveCompletionNotification } from "../utils/solveCompletionNotif
 import { createQuoteRequestGate } from "../utils/quote-request-gate";
 import { canRequestQuote } from "../utils/quote-eligibility";
 import { requireDeferredV4Execution } from "../utils/deferred-v4-execution";
+import { externalV4BatchOptions } from "../utils/external-v4-batch-mode";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -670,12 +671,12 @@ export default function BalancePage() {
         quoteResult,
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
-        // A selected v4 PoolKey needs the bridge and the destination swap to
-        // remain explicit stages. Each stage is still an atomic, user-paid
-        // EIP-5792 bundle; do not silently downgrade this demo flow to a
-        // series of independent approvals and swaps.
-        batchMode: dexRoute === "automatic-v3" ? "auto" : "wallet",
-        allowSequentialFallback: dexRoute === "automatic-v3",
+        // Prefer one user-paid EIP-5792 request for each stage, while allowing
+        // wallets without that optional RPC method to confirm the same calls
+        // sequentially. The destination v4 calls remain gated on settlement.
+        ...(dexRoute === "automatic-v3"
+          ? { batchMode: "auto" as const, allowSequentialFallback: true }
+          : externalV4BatchOptions()),
         allowGaslessSmartAccount: useGasless,
         gasless: useGasless,
       };
@@ -1193,16 +1194,16 @@ export default function BalancePage() {
                           }{" "}
                           source call(s) on chain{" "}
                           {quoteResult.externalExecution.sourceChainId}. Your
-                          wallet will offer one user-paid atomic batch through
-                          EIP-5792. If the wallet cannot support atomic calls,
-                          this v4 route stops before submitting calls. The
-                          destination v4 calldata is refreshed only after bridge
-                          settlement.
+                          wallet will offer one user-paid EIP-5792 batch when
+                          supported. Otherwise, it will request the source calls
+                          individually and in order. The destination v4 calldata
+                          is refreshed only after bridge settlement.
                         </div>
                         {quoteResult.externalExecution.destinationSwap && (
                           <div className="mt-1">
                             Then the wallet will offer a separate user-paid
-                            batch for{" "}
+                            batch when supported, otherwise individual
+                            confirmations, for{" "}
                             {
                               quoteResult.externalExecution.destinationSwap
                                 .executionTransactions.length
