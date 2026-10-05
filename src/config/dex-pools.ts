@@ -1,7 +1,6 @@
 import {
   DEX_POOLS_EXTRA_TYPESTRING,
   encodeDexPools,
-  EXTERNAL_PROVIDER_EXTRA_TYPESTRING,
   EXTERNAL_QUOTE_PROVIDERS,
   type ExternalQuoteProvider,
   type UniswapV4PoolPreference,
@@ -23,12 +22,12 @@ const EXTERNAL_PROVIDER_LABELS: Record<ExternalQuoteProvider, string> = {
   lifi: "LI.FI only",
 };
 
-/** Providers understood by the external solver's signed `provider` field. */
+/** Providers that can be selected before the SDK signs the intent. */
 export const EXTERNAL_PROVIDER_OPTIONS: ReadonlyArray<{
   id: ExternalProviderSelection;
   label: string;
 }> = [
-  { id: "any", label: "Any enabled provider" },
+  { id: "any", label: "LI.FI (SDK default)" },
   ...EXTERNAL_QUOTE_PROVIDERS.map((id) => ({
     id,
     label: EXTERNAL_PROVIDER_LABELS[id],
@@ -162,7 +161,6 @@ type FixedV4Route = {
   tokenIn: TokenInfo;
   tokenOut: TokenInfo;
   testingInstructions: string;
-  requiredProvider?: ExternalQuoteProvider;
   autoSelectForOutput?: boolean;
 };
 
@@ -204,7 +202,6 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
       address: "0x52090044B98bacBA07693B464E11Cbdf69313351",
       decimals: 18,
     },
-    requiredProvider: "lifi",
     autoSelectForOutput: true,
     testingInstructions:
       "Select PPORT to sign the Robinhood WETH/PPORT v4 PoolKey. The route is fixed to LI.FI: it bridges your source token into Robinhood WETH before the destination v4 swap.",
@@ -222,7 +219,6 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
       address: "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18",
       decimals: 18,
     },
-    requiredProvider: "lifi",
     autoSelectForOutput: true,
     testingInstructions:
       "Select AI to sign the live Robinhood AI/USDG FablesRamp v4 PoolKey. LI.FI bridges the source token into Robinhood USDG, then the destination swap spends USDG for AI. The route was read-only quoted successfully from Base USDC before being added here.",
@@ -238,7 +234,6 @@ export type DexRouteExtraData = {
   extraDataTypestring: string;
   extraData: {
     somethingKey: string;
-    provider?: ExternalQuoteProvider;
     dexPools?: string;
   };
 };
@@ -280,26 +275,10 @@ export function buildDexRouteExtraData(params: {
   destinationChainId: number | undefined;
   tokenIn: string;
   tokenOut: string;
-  provider?: ExternalQuoteProvider;
 }): DexRouteExtraData {
   const route = getDexRouteTestConfig(params.route);
   if (!route) {
-    return params.provider
-      ? {
-          extraDataTypestring: `${DEFAULT_EXTRA_DATA.extraDataTypestring},${EXTERNAL_PROVIDER_EXTRA_TYPESTRING}`,
-          extraData: {
-            ...DEFAULT_EXTRA_DATA.extraData,
-            provider: params.provider,
-          },
-        }
-      : DEFAULT_EXTRA_DATA;
-  }
-
-  const selectedProvider = params.provider ?? route.requiredProvider;
-  if (route.requiredProvider && selectedProvider !== route.requiredProvider) {
-    throw new Error(
-      `The selected v4 route requires provider ${route.requiredProvider}.`,
-    );
+    return DEFAULT_EXTRA_DATA;
   }
 
   const key = route.pool.poolKey;
@@ -320,14 +299,12 @@ export function buildDexRouteExtraData(params: {
   return {
     extraDataTypestring: [
       DEFAULT_EXTRA_DATA.extraDataTypestring,
-      selectedProvider ? EXTERNAL_PROVIDER_EXTRA_TYPESTRING : undefined,
       DEX_POOLS_EXTRA_TYPESTRING,
     ]
       .filter((entry): entry is string => Boolean(entry))
       .join(","),
     extraData: {
       ...DEFAULT_EXTRA_DATA.extraData,
-      ...(selectedProvider ? { provider: selectedProvider } : {}),
       dexPools: encodeDexPools([route.pool]),
     },
   };

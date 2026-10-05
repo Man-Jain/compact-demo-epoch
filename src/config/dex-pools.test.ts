@@ -13,7 +13,7 @@ const ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
 const ROBINHOOD_PPORT = "0x52090044B98bacBA07693B464E11Cbdf69313351";
 const ROBINHOOD_AI = "0x2E8c31162b855A2ffa90F6F8634643Ad6F111e18";
 
-const V4_WITNESS = "uint256 somethingKey,string provider,string dexPools";
+const V4_WITNESS = "uint256 somethingKey,string dexPools";
 
 test("lists every selectable external provider", () => {
   assert.deepEqual(
@@ -22,36 +22,28 @@ test("lists every selectable external provider", () => {
   );
 });
 
-test("signs a selected external provider without a preferred DEX pool", () => {
+test("does not embed a provider in an automatic DEX route", () => {
   const result = buildDexRouteExtraData({
     route: "automatic-v3",
     destinationChainId: 84532,
     tokenIn: BASE_SEPOLIA_USDC,
     tokenOut: BASE_SEPOLIA_USDT,
-    provider: "khalani",
   });
 
-  assert.equal(
-    result.extraDataTypestring,
-    "uint256 somethingKey,string provider",
-  );
-  assert.deepEqual(result.extraData, {
-    somethingKey: "123",
-    provider: "khalani",
-  });
+  assert.equal(result.extraDataTypestring, "uint256 somethingKey");
+  assert.deepEqual(result.extraData, { somethingKey: "123" });
 });
 
-test("combines LI.FI and a hooked v4 PoolKey in one witness", () => {
+test("includes only the hooked v4 PoolKey in a route witness", () => {
   const result = buildDexRouteExtraData({
     route: "base-sepolia-hooked-v4",
     destinationChainId: 84532,
     tokenIn: BASE_SEPOLIA_USDC,
     tokenOut: BASE_SEPOLIA_USDT,
-    provider: "lifi",
   });
 
   assert.equal(result.extraDataTypestring, V4_WITNESS);
-  assert.equal(result.extraData.provider, "lifi");
+  assert.equal("provider" in result.extraData, false);
   assert.equal(typeof result.extraData.dexPools, "string");
 });
 
@@ -61,9 +53,8 @@ test("allows a different source asset for an external destination v4 swap", () =
     destinationChainId: 84532,
     tokenIn: "0x7946dd86eE310D0aC16804A37787289Fa5b88A8A",
     tokenOut: BASE_SEPOLIA_USDT,
-    provider: "lifi",
   });
-  assert.equal(result.extraData.provider, "lifi");
+  assert.equal("provider" in result.extraData, false);
   assert.equal(typeof result.extraData.dexPools, "string");
 });
 
@@ -97,7 +88,7 @@ test("selecting PPORT chooses the LI.FI-backed Robinhood v4 route", () => {
     tokenIn: BASE_SEPOLIA_USDC,
     tokenOut: ROBINHOOD_PPORT,
   });
-  assert.equal(result.extraData.provider, "lifi");
+  assert.equal("provider" in result.extraData, false);
   assert.equal(result.extraDataTypestring, V4_WITNESS);
   assert.equal(typeof result.extraData.dexPools, "string");
 });
@@ -115,7 +106,7 @@ test("selecting AI signs the verified LI.FI-backed FablesRamp v4 route", () => {
     tokenOut: ROBINHOOD_AI,
   });
 
-  assert.equal(result.extraData.provider, "lifi");
+  assert.equal("provider" in result.extraData, false);
   assert.equal(typeof result.extraData.dexPools, "string");
   const [pool] = JSON.parse(result.extraData.dexPools ?? "[]");
   assert.deepEqual(pool.poolKey, {
@@ -126,18 +117,4 @@ test("selecting AI signs the verified LI.FI-backed FablesRamp v4 route", () => {
     hooks: "0x08E52564Bad99E05a694B4809F397eDCA417A080".toLowerCase(),
   });
   assert.equal(result.extraDataTypestring, V4_WITNESS);
-});
-
-test("rejects a non-LI.FI provider for the Robinhood PPORT route", () => {
-  assert.throws(
-    () =>
-      buildDexRouteExtraData({
-        route: "robinhood-weth-pport-v4",
-        destinationChainId: 4663,
-        tokenIn: BASE_SEPOLIA_USDC,
-        tokenOut: ROBINHOOD_PPORT,
-        provider: "near",
-      }),
-    /requires provider lifi/,
-  );
 });

@@ -481,7 +481,6 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
-        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       // Quote construction only reads the active chain id. Some injected
       // wallets briefly expose account/chain state before wagmi resolves its
@@ -513,6 +512,9 @@ export default function BalancePage() {
           recipient: address as `0x${string}`,
         },
         ...dexRouteExtraData,
+        ...(externalProvider === "any"
+          ? {}
+          : { externalQuoteProviders: [externalProvider] }),
       });
 
       const result = await epochSdk.getIntentQuote({
@@ -588,7 +590,6 @@ export default function BalancePage() {
         destinationChainId: destinationChainIdNumber,
         tokenIn: depositChecksumAddress!,
         tokenOut: outputChecksumAddress!,
-        ...(externalProvider === "any" ? {} : { provider: externalProvider }),
       });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
@@ -615,6 +616,9 @@ export default function BalancePage() {
           recipient: address as `0x${string}`,
         },
         ...dexRouteExtraData,
+        ...(externalProvider === "any"
+          ? {}
+          : { externalQuoteProviders: [externalProvider] }),
       });
 
       console.log("taskTypeString: ", taskTypeString);
@@ -1031,9 +1035,9 @@ export default function BalancePage() {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  A specific provider is signed as <code>provider</code> and
-                  uses the external multi-transaction solver. “Any” leaves the
-                  provider unsigned so enabled solvers can compete.
+                  LI.FI is signed by the SDK when no provider is selected. A
+                  specific selection is passed to the SDK as a one-provider list
+                  and uses the external multi-transaction solver.
                 </p>
               </div>
 
@@ -1069,8 +1073,8 @@ export default function BalancePage() {
                       const nextRoute = event.target.value as DexRouteId;
                       setDexRoute(nextRoute);
                       const nextTestConfig = getDexRouteTestConfig(nextRoute);
-                      if (nextTestConfig?.requiredProvider) {
-                        setExternalProvider(nextTestConfig.requiredProvider);
+                      if (nextTestConfig) {
+                        setExternalProvider("lifi");
                         setRoutingPreset("external-multi-transactions");
                       } else if (
                         nextRoute === "ethereum-mainnet-stablepair-v4"
