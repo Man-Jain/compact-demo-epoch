@@ -32,6 +32,7 @@ export const RPC_ENDPOINTS: Record<number, string> = {
   ),
   11155111: ankrRpc("eth_sepolia", sepolia.rpcUrls.default.http[0]),
   46630: "https://rpc.testnet.chain.robinhood.com",
+  466300: "https://tesoro-staging1.exe.xyz/rpc",
 };
 
 const VIEM_CHAIN_RPCS = [

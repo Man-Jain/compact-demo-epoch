@@ -12,7 +12,9 @@ export type DexRouteId =
   | "base-sepolia-hooked-v4"
   | "ethereum-mainnet-stablepair-v4"
   | "robinhood-weth-pport-v4"
-  | "robinhood-ai-usdg-v4";
+  | "robinhood-ai-usdg-v4"
+  | "robinhood-eth-toro-v4"
+  | "tesoro-staging-eth-toro-v4";
 
 export type ExternalProviderSelection = "any" | ExternalQuoteProvider;
 
@@ -67,6 +69,18 @@ export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
     label: "Robinhood AI/USDG Uniswap v4 (FablesRamp)",
     description:
       "LI.FI bridges into Robinhood USDG, then the selected FablesRamp v4 PoolKey swaps USDG to AI.",
+  },
+  {
+    id: "robinhood-eth-toro-v4",
+    label: "Robinhood ETH/TORO Uniswap v4 (Tesoro hook)",
+    description:
+      "LI.FI bridges into native ETH on Robinhood, then the selected hooked v4 pool swaps ETH to TORO.",
+  },
+  {
+    id: "tesoro-staging-eth-toro-v4",
+    label: "Tesoro Staging ETH/TORO Uniswap v4",
+    description:
+      "Direct staging-chain test of the native ETH/TORO pool and Tesoro fee hook. No bridge.",
   },
 ];
 
@@ -153,6 +167,24 @@ const ETHEREUM_MAINNET_STABLEPAIR_POOL: UniswapV4PoolPreference = {
   hookData: "0x",
 };
 
+const TESORO_STAGING_ETH_TORO_POOL: UniswapV4PoolPreference = {
+  protocol: "uniswap-v4",
+  chainId: 466300,
+  poolKey: {
+    currency0: "0x0000000000000000000000000000000000000000",
+    currency1: "0x95B551C94A2457B597e4838457eFFB4731880411",
+    fee: 3000,
+    tickSpacing: 60,
+    hooks: "0xc035dc35566F8dc36331f30d5Ec4108A2eDeD0cC",
+  },
+  hookData: "0x",
+};
+
+const ROBINHOOD_ETH_TORO_POOL: UniswapV4PoolPreference = {
+  ...TESORO_STAGING_ETH_TORO_POOL,
+  chainId: 4663,
+};
+
 type FixedV4RouteId = Exclude<DexRouteId, "automatic-v3">;
 
 type FixedV4Route = {
@@ -222,6 +254,39 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
     autoSelectForOutput: true,
     testingInstructions:
       "Select AI to sign the live Robinhood AI/USDG FablesRamp v4 PoolKey. LI.FI bridges the source token into Robinhood USDG, then the destination swap spends USDG for AI. The route was read-only quoted successfully from Base USDC before being added here.",
+  },
+  "robinhood-eth-toro-v4": {
+    destinationChainId: 4663,
+    pool: ROBINHOOD_ETH_TORO_POOL,
+    tokenIn: {
+      symbol: "ETH",
+      address: "0x0000000000000000000000000000000000000000",
+      decimals: 18,
+    },
+    tokenOut: {
+      symbol: "TORO",
+      address: "0x95B551C94A2457B597e4838457eFFB4731880411",
+      decimals: 18,
+    },
+    autoSelectForOutput: true,
+    testingInstructions:
+      "Select TORO to sign the Robinhood mainnet ETH/TORO Tesoro-hook PoolKey. LI.FI bridges your source asset into native ETH on Robinhood; after bridge settlement, the destination v4 swap spends only the confirmed ETH received. Keep separate ETH on Robinhood for gas.",
+  },
+  "tesoro-staging-eth-toro-v4": {
+    destinationChainId: 466300,
+    pool: TESORO_STAGING_ETH_TORO_POOL,
+    tokenIn: {
+      symbol: "ETH",
+      address: "0x0000000000000000000000000000000000000000",
+      decimals: 18,
+    },
+    tokenOut: {
+      symbol: "TORO",
+      address: "0x95B551C94A2457B597e4838457eFFB4731880411",
+      decimals: 18,
+    },
+    testingInstructions:
+      "Direct Tesoro Staging test only. Connect a wallet on chain 466300 with test ETH for both the swap and gas. No LI.FI bridge is available to staging.",
   },
 };
 

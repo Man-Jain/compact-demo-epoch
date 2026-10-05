@@ -2,6 +2,14 @@
 
 ## External solver providers and destination Uniswap v4 pools
 
+### Direct Tesoro Staging ETH/TORO test
+
+Choose **Tesoro Staging ETH/TORO Uniswap v4** under DEX Pool Route. This opens a direct staging test panel with **Get staging quote** and **Execute ETH → TORO**. Switch the wallet to Tesoro Staging (chain `466300`), fund it with staging ETH for the swap and gas, and connect the demo to the external solver using `VITE_EXTERNAL_SOLVER_URL` (for local development it defaults to `http://127.0.0.1:3010`). The solver must allow the demo origin in `EXTERNAL_SOLVER_CORS_ORIGINS`. The panel uses the production `/v4/refresh` quote and calldata builder, verifies pool ID `0xdd62283eaa53784680f7d19760a4305ef7c7e4806b158cc0cef9f4926e8d768d`, shows the payable value and zero approvals, refreshes the quote before execution, and checks the received TORO balance after confirmation. Tesoro Staging is a direct swap test; LI.FI does not bridge to chain `466300`.
+
+### Base to Robinhood mainnet ETH/TORO
+
+For the cross-chain route, choose Robinhood (`4663`) as the destination and TORO as the output token, or select **Robinhood ETH/TORO Uniswap v4 (Tesoro hook)** under DEX Pool Route. This signs the mainnet ETH/TORO PoolKey, selects LI.FI for the bridge, and quotes native ETH as the bridge destination. After the bridge confirms delivery to the executing wallet, the SDK refreshes the destination quote and presents the payable ETH → TORO v4 transaction. The swap uses only the confirmed delivered ETH; the wallet also needs separate Robinhood ETH for gas. This mainnet route uses the same pool ID as the staging copy: `0xdd62283eaa53784680f7d19760a4305ef7c7e4806b158cc0cef9f4926e8d768d`.
+
 The ERC-20 intent form lets a tester choose both the external quote provider
 and the destination DEX pool route. The selections are included in the signed
 Compact extra data, so the quote and submitted intent use the same routing
