@@ -16,6 +16,7 @@ import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
 import { GaslessCheckbox } from "../components/GaslessCheckbox";
 import { Wallet7702StatusPanel } from "../components/Wallet7702StatusPanel";
+import { TesoroStagingSwap } from "../components/TesoroStagingSwap";
 import { useGaslessWallet } from "../hooks/useGaslessWallet";
 import { isInjectedWallet } from "../gasless/wallet-capability";
 import { config as apiConfig } from "../config/api";
@@ -135,7 +136,7 @@ export default function BalancePage() {
   } = useEffectiveWallet();
   const { setChainId: setLocalChainId } = useLocalSigner();
   const { showNotification } = useNotification();
-  const { allocatorAddress } = useAllocatorAPI();
+  const { allocatorAddress, error: allocatorError } = useAllocatorAPI();
   const { supportedChains } = useChainConfig();
   const { isConfirming } = useCompact();
   const { writeContractAsync } = useWriteContract();
@@ -1073,7 +1074,10 @@ export default function BalancePage() {
                       const nextRoute = event.target.value as DexRouteId;
                       setDexRoute(nextRoute);
                       const nextTestConfig = getDexRouteTestConfig(nextRoute);
-                      if (nextTestConfig) {
+                      if (
+                        nextTestConfig &&
+                        nextRoute !== "tesoro-staging-eth-toro-v4"
+                      ) {
                         setExternalProvider("lifi");
                         setRoutingPreset("external-multi-transactions");
                       } else if (
@@ -1081,7 +1085,10 @@ export default function BalancePage() {
                       ) {
                         setRoutingPreset("external-multi-transactions");
                       }
-                      if (nextTestConfig) {
+                      if (
+                        nextTestConfig &&
+                        nextRoute !== "tesoro-staging-eth-toro-v4"
+                      ) {
                         setDestinationChainId(
                           nextTestConfig.destinationChainId.toString(),
                         );
@@ -1122,40 +1129,46 @@ export default function BalancePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Minimum Output Amount
-                  </label>
-                  <input
-                    type="text"
-                    value={outputAmount}
-                    onChange={(e) => {
-                      setOutputAmount(e.target.value);
-                      setQuoteResult(null);
-                    }}
-                    placeholder="0.0"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Input Amount
-                  </label>
-                  <input
-                    type="text"
-                    value={inputAmountDisplay}
-                    onChange={(e) => {
-                      setInputAmountDisplay(e.target.value);
-                      setQuoteResult(null);
-                    }}
-                    placeholder="0.0"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  />
-                </div>
-              </div>
+              {dexRoute === "tesoro-staging-eth-toro-v4" && (
+                <TesoroStagingSwap />
+              )}
 
-              {quoteResult && (
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Minimum Output Amount
+                    </label>
+                    <input
+                      type="text"
+                      value={outputAmount}
+                      onChange={(e) => {
+                        setOutputAmount(e.target.value);
+                        setQuoteResult(null);
+                      }}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Input Amount
+                    </label>
+                    <input
+                      type="text"
+                      value={inputAmountDisplay}
+                      onChange={(e) => {
+                        setInputAmountDisplay(e.target.value);
+                        setQuoteResult(null);
+                      }}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && quoteResult && (
                 <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2">
                   <div className="text-sm font-medium text-gray-300">
                     Quote Result
@@ -1229,7 +1242,8 @@ export default function BalancePage() {
                 </div>
               )}
 
-              {effectiveAllowGasless ? (
+              {dexRoute !== "tesoro-staging-eth-toro-v4" &&
+              effectiveAllowGasless ? (
                 <GaslessCheckbox
                   checked={gasless}
                   onChange={setGasless}
@@ -1244,40 +1258,55 @@ export default function BalancePage() {
                 />
               ) : null}
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={fetchIntentQuote}
-                  disabled={!canFetchQuote || isLoadingQuote || isConfirming}
-                  className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoadingQuote
-                    ? "Loading Quote..."
-                    : dexRoute === "robinhood-weth-pport-v4"
-                      ? "Get LI.FI + PPORT Quote"
-                      : dexRoute === "robinhood-ai-usdg-v4"
-                        ? "Get LI.FI + AI Quote"
-                        : "Get Quote"}
-                </button>
-                <button
-                  onClick={onSubmit}
-                  disabled={!isFormValid || !walletClient || isConfirming}
-                  className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isConfirming
-                    ? "Executing..."
-                    : dexRoute === "robinhood-weth-pport-v4"
-                      ? "Execute LI.FI + PPORT Route"
-                      : dexRoute === "robinhood-ai-usdg-v4"
-                        ? "Execute LI.FI + AI Route"
-                        : "Deposit + Submit Intent"}
-                </button>
-              </div>
-              {!canFetchQuote && (
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={fetchIntentQuote}
+                    disabled={!canFetchQuote || isLoadingQuote || isConfirming}
+                    className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingQuote
+                      ? "Loading Quote..."
+                      : dexRoute === "robinhood-weth-pport-v4"
+                        ? "Get LI.FI + PPORT Quote"
+                        : dexRoute === "robinhood-ai-usdg-v4"
+                          ? "Get LI.FI + AI Quote"
+                          : "Get Quote"}
+                  </button>
+                  <button
+                    onClick={onSubmit}
+                    disabled={!isFormValid || !walletClient || isConfirming}
+                    className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isConfirming
+                      ? "Executing..."
+                      : dexRoute === "robinhood-weth-pport-v4"
+                        ? "Execute LI.FI + PPORT Route"
+                        : dexRoute === "robinhood-ai-usdg-v4"
+                          ? "Execute LI.FI + AI Route"
+                          : "Deposit + Submit Intent"}
+                  </button>
+                </div>
+              )}
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && !canFetchQuote && (
                 <p className="text-xs text-yellow-400">
-                  Get Quote activates after a wallet is connected, the allocator
-                  is available, and both ERC-20 token addresses have resolved on
-                  their selected chains.
+                  {!isConnected || !address
+                    ? "Connect a wallet to get a quote."
+                    : !allocatorAddress
+                      ? `Allocator unavailable${allocatorError ? `: ${allocatorError}` : ""}. Retrying automatically.`
+                      : !depositChecksumAddress ||
+                          !isValidDeposit ||
+                          isLoadingDeposit
+                        ? "Waiting for the source token address to resolve."
+                        : !outputChecksumAddress ||
+                            !isValidOutput ||
+                            isLoadingOutput
+                          ? "Waiting for the destination token address to resolve."
+                          : outputDecimals === undefined ||
+                              depositDecimals === undefined
+                            ? "Waiting for token decimals from the selected chains."
+                            : "Check the amount and routing selection before getting a quote."}
                 </p>
               )}
             </div>

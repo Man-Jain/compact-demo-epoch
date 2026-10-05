@@ -1,4 +1,5 @@
 import { http } from "wagmi";
+import { defineChain } from "viem";
 import {
   mainnet,
   robinhood,
@@ -16,6 +17,14 @@ import { getRpcUrlForChain } from "./rpc";
 
 const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
 
+export const tesoroStaging = defineChain({
+  id: 466300,
+  name: "Tesoro Staging",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["https://tesoro-staging1.exe.xyz/rpc"] } },
+  testnet: true,
+});
+
 export const chains = [
   mainnet,
   robinhood,
@@ -27,6 +36,7 @@ export const chains = [
   arbitrum,
   base,
   optimism,
+  tesoroStaging,
 ] as const;
 
 export const SUPPORTED_CHAIN_IDS = new Set<number>(
@@ -58,4 +68,5 @@ export const CHAIN_IDS = {
   ARBITRUM: arbitrum.id,
   BASE: base.id,
   OPTIMISM: optimism.id,
+  TESORO_STAGING: tesoroStaging.id,
 } as const;
