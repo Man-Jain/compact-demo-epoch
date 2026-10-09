@@ -37,3 +37,21 @@ test("explains that wallet batching is paid and chain-local", () => {
   assert.equal(confirmed?.title, "Wallet batch confirmed");
   assert.match(confirmed?.message ?? "", /Robinhood/i);
 });
+
+test("explains that Epoch pays only Robinhood destination gas", () => {
+  const waiting = getExecutionStatusNotification({
+    phase: "waiting-for-sponsored-destination",
+    transactionIndex: 2,
+    totalTransactions: 3,
+    chainId: 4663,
+  });
+  assert.match(waiting?.message ?? "", /Epoch pays the destination gas/);
+  const confirmed = getExecutionStatusNotification({
+    phase: "sponsored-destination-confirmed",
+    transactionIndex: 2,
+    totalTransactions: 3,
+    chainId: 4663,
+    transactionHash: "0x1234",
+  });
+  assert.equal(confirmed?.title, "Sponsored swap confirmed");
+});

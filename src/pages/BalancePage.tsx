@@ -675,6 +675,11 @@ export default function BalancePage() {
         intentData,
         quoteResult,
         routingAndLiquidityOptions,
+        // The source bridge remains user-paid. Epoch sponsors the destination
+        // Robinhood v4 swap when the relay and wallet both support it.
+        destinationSponsorship: dexRoute.startsWith("robinhood-")
+          ? "try"
+          : "off",
         onExecutionStatus: reportExecutionStatus,
         // Prefer one user-paid EIP-5792 request for each stage, while allowing
         // wallets without that optional RPC method to confirm the same calls

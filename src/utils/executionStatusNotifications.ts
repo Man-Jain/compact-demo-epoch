@@ -115,6 +115,35 @@ export function getExecutionStatusNotification(
         stage: "initiated",
         ...inProgress,
       };
+    case "preparing-sponsored-destination":
+      return {
+        type: "info",
+        title: "Preparing sponsored swap",
+        message:
+          "Epoch is verifying the bridged asset and the signed Uniswap v4 pool before paying Robinhood gas.",
+        stage: "initiated",
+        ...inProgress,
+      };
+    case "waiting-for-sponsored-destination":
+      return {
+        type: "info",
+        title: "Waiting for Epoch relay",
+        message:
+          "Confirm the exact swap delegation in your wallet. Epoch pays the destination gas; your bridged asset funds the swap.",
+        stage: "submitted",
+        ...inProgress,
+      };
+    case "sponsored-destination-confirmed":
+      return {
+        type: "success",
+        title: "Sponsored swap confirmed",
+        message:
+          "The Robinhood Uniswap v4 swap confirmed. Epoch paid the destination gas.",
+        stage: "confirmed",
+        txHash: status.transactionHash,
+        chainId: status.chainId,
+        autoHide: false,
+      };
     default:
       return null;
   }
