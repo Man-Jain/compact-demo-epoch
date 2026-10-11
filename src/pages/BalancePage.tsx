@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWriteContract } from "wagmi";
-import { parseUnits, zeroAddress } from "viem";
+import {
+  createPublicClient,
+  formatEther,
+  http,
+  parseUnits,
+  zeroAddress,
+} from "viem";
+import { robinhood } from "viem/chains";
 import { useNotification } from "../hooks/useNotification";
 import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
@@ -38,6 +45,7 @@ import { createQuoteRequestGate } from "../utils/quote-request-gate";
 import { canRequestQuote } from "../utils/quote-eligibility";
 import { requireDeferredV4Execution } from "../utils/deferred-v4-execution";
 import { externalV4BatchOptions } from "../utils/external-v4-batch-mode";
+import { destinationGasBudget } from "../utils/destination-gas";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -639,6 +647,37 @@ export default function BalancePage() {
         requireDeferredV4Execution(quoteResult);
       }
 
+      let destinationGasReserveWei: string | undefined;
+      const externalPlan = quoteResult.externalExecution;
+      if (externalPlan?.destinationSwap?.chainId === robinhood.id) {
+        const destinationClient = createPublicClient({
+          chain: robinhood,
+          transport: http(robinhood.rpcUrls.default.http[0]),
+        });
+        const [gasPriceWei, walletBalanceWei] = await Promise.all([
+          destinationClient.getGasPrice(),
+          destinationClient.getBalance({ address: address as `0x${string}` }),
+        ]);
+        const budget = destinationGasBudget({
+          bridgeToken: externalPlan.lifi.bridgeToken,
+          estimatedBridgeAmount: externalPlan.destinationSwap.amountIn
+            ? BigInt(externalPlan.destinationSwap.amountIn)
+            : undefined,
+          gasPriceWei,
+          transactionCount:
+            externalPlan.destinationSwap.executionTransactions.length,
+          walletBalanceWei,
+        });
+        if (budget.requiredWalletWei > 0n) {
+          throw new Error(
+            `Add at least ${formatEther(budget.requiredWalletWei)} ETH to ${address} on Robinhood for three destination transactions, then try again.`,
+          );
+        }
+        if (budget.reserveWei > 0n) {
+          destinationGasReserveWei = budget.reserveWei.toString();
+        }
+      }
+
       const useGasless = effectiveAllowGasless && gasless;
       if (useGasless && gaslessWallet.needsEpochSetup) {
         showNotification({
@@ -674,6 +713,7 @@ export default function BalancePage() {
         taskTypeString,
         intentData,
         quoteResult,
+        ...(destinationGasReserveWei ? { destinationGasReserveWei } : {}),
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
         // Prefer one user-paid EIP-5792 request for each stage, while allowing
@@ -1231,6 +1271,15 @@ export default function BalancePage() {
                                 .chainId
                             }
                             .
+                          </div>
+                        )}
+                        {quoteResult.externalExecution.destinationSwap
+                          ?.chainId === robinhood.id && (
+                          <div className="mt-1">
+                            {quoteResult.externalExecution.lifi.bridgeToken.toLowerCase() ===
+                            zeroAddress
+                              ? "Before bridging, the demo prices gas for at least three Robinhood calls. Any shortfall in your Robinhood wallet is reserved from the bridge delivery; the displayed output quote is before this reserve."
+                              : "Before bridging, the demo checks that your Robinhood wallet holds enough ETH for at least three destination calls. If not, it asks you to fund that wallet."}
                           </div>
                         )}
                       </div>
