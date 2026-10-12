@@ -15,7 +15,9 @@ import {
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { getRpcUrlForChain } from "./rpc";
 
-const projectId = "YOUR_PROJECT_ID"; // Get from WalletConnect Cloud
+const projectId =
+  import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ||
+  "6d06ee285dc5aa014a2bf609d0827cd6";
 
 export const tesoroStaging = defineChain({
   id: 466300,
