@@ -1,5 +1,14 @@
 # React + TypeScript + Vite
 
+## WalletConnect project for hosted builds
+
+The demo uses Epoch's Reown project ID `6d06ee285dc5aa014a2bf609d0827cd6`
+by default. `VITE_WALLETCONNECT_PROJECT_ID` can override it at build time. In
+the Reown dashboard for the selected project, allow
+`https://demo.epochprotocol.xyz`. Reown can take up to 15 minutes to apply
+allowlist updates. The hosted build previously used RainbowKit's shared
+fallback ID, which rejects the hosted origin.
+
 ## External solver providers and destination Uniswap v4 pools
 
 ### Direct Tesoro Staging ETH/TORO test
