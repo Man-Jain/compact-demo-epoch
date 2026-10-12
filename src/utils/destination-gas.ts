@@ -25,6 +25,11 @@ export function destinationGasBudget(args: {
   const shortfallWei =
     args.walletBalanceWei >= budgetWei ? 0n : budgetWei - args.walletBalanceWei;
   if (args.bridgeToken.toLowerCase() === zeroAddress) {
+    if (shortfallWei > 0n && args.estimatedBridgeAmount === undefined) {
+      throw new Error(
+        "Cannot verify destination gas reserve without an estimated ETH bridge amount",
+      );
+    }
     if (
       args.estimatedBridgeAmount !== undefined &&
       args.estimatedBridgeAmount <= shortfallWei

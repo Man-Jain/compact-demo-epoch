@@ -42,6 +42,19 @@ test("rejects an ETH bridge too small to cover the gas reserve", () => {
   );
 });
 
+test("requires an estimated ETH delivery before reserving bridge proceeds", () => {
+  assert.throws(
+    () =>
+      destinationGasBudget({
+        bridgeToken: NATIVE,
+        gasPriceWei: 20n,
+        transactionCount: 1,
+        walletBalanceWei: 0n,
+      }),
+    /Cannot verify destination gas reserve without an estimated ETH bridge amount/,
+  );
+});
+
 test("uses existing wallet ETH before reserving bridge proceeds", () => {
   const result = destinationGasBudget({
     bridgeToken: NATIVE,
