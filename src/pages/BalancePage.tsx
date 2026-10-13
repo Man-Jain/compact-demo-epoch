@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWriteContract } from "wagmi";
-import {
-  createPublicClient,
-  formatEther,
-  http,
-  parseUnits,
-  zeroAddress,
-} from "viem";
+import { formatEther, formatUnits, parseUnits, zeroAddress } from "viem";
 import { robinhood } from "viem/chains";
 import { useNotification } from "../hooks/useNotification";
 import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
@@ -45,7 +39,6 @@ import { createQuoteRequestGate } from "../utils/quote-request-gate";
 import { canRequestQuote } from "../utils/quote-eligibility";
 import { requireV4QuoteExecution } from "../utils/deferred-v4-execution";
 import { externalV4BatchOptions } from "../utils/external-v4-batch-mode";
-import { destinationGasBudget } from "../utils/destination-gas";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
@@ -175,6 +168,7 @@ export default function BalancePage() {
   const [quoteResult, setQuoteResult] = useState<IntentQuoteResult | null>(
     null,
   );
+  const [destinationQuoteUpdated, setDestinationQuoteUpdated] = useState(false);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const quoteRequestGateRef = useRef(createQuoteRequestGate());
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -453,6 +447,7 @@ export default function BalancePage() {
     const requestId = quoteRequestGateRef.current.begin();
     setIsLoadingQuote(true);
     setQuoteResult(null);
+    setDestinationQuoteUpdated(false);
     try {
       const dexRouteExtraData = buildDexRouteExtraData({
         route: dexRoute,
@@ -515,8 +510,9 @@ export default function BalancePage() {
       showNotification({
         type: "success",
         title: "Quote Retrieved",
+        // The SDK's tokenOut is the final v4 asset after its destination-gas reserve.
         message: deferredV4Execution
-          ? `Expected output: ${result.tokenOut ?? "—"} (raw). After LI.FI settles, sign ${deferredV4Execution.transactionCount} Robinhood transaction(s) on chain ${deferredV4Execution.chainId}.`
+          ? `Expected output: ${result.tokenOut ? formatUnits(BigInt(result.tokenOut), outputDecimals ?? 18) : "—"} ${outputSymbol ?? "tokens"}. After bridge settlement, sign ${deferredV4Execution.transactionCount} destination transaction(s) on chain ${deferredV4Execution.chainId}.`
           : `Expected output: ${result.tokenOut ?? "—"} (raw)`,
         chainId,
         autoHide: true,
@@ -621,37 +617,6 @@ export default function BalancePage() {
         );
       }
 
-      let destinationGasReserveWei: string | undefined;
-      const externalPlan = quoteResult.externalExecution;
-      if (externalPlan?.destinationSwap?.chainId === robinhood.id) {
-        const destinationClient = createPublicClient({
-          chain: robinhood,
-          transport: http(robinhood.rpcUrls.default.http[0]),
-        });
-        const [gasPriceWei, walletBalanceWei] = await Promise.all([
-          destinationClient.getGasPrice(),
-          destinationClient.getBalance({ address: address as `0x${string}` }),
-        ]);
-        const budget = destinationGasBudget({
-          bridgeToken: externalPlan.lifi.bridgeToken,
-          estimatedBridgeAmount: externalPlan.destinationSwap.amountIn
-            ? BigInt(externalPlan.destinationSwap.amountIn)
-            : undefined,
-          gasPriceWei,
-          transactionCount:
-            externalPlan.destinationSwap.executionTransactions.length,
-          walletBalanceWei,
-        });
-        if (budget.requiredWalletWei > 0n) {
-          throw new Error(
-            `Add at least ${formatEther(budget.requiredWalletWei)} ETH to ${address} on Robinhood for three destination transactions, then try again.`,
-          );
-        }
-        if (budget.reserveWei > 0n) {
-          destinationGasReserveWei = budget.reserveWei.toString();
-        }
-      }
-
       const useGasless = effectiveAllowGasless && gasless;
       if (useGasless && gaslessWallet.needsEpochSetup) {
         showNotification({
@@ -687,9 +652,37 @@ export default function BalancePage() {
         taskTypeString,
         intentData,
         quoteResult,
-        ...(destinationGasReserveWei ? { destinationGasReserveWei } : {}),
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
+        onDestinationQuote: (updated) => {
+          setQuoteResult((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  tokenOut: updated.tokenOut,
+                  minimumTokenOut: updated.minimumTokenOut,
+                  outputTokenAddress: updated.outputTokenAddress,
+                  destinationGas: previous.destinationGas
+                    ? {
+                        ...previous.destinationGas,
+                        budgetWei: updated.gasBudgetWei,
+                        reserveWei: updated.gasReserveWei,
+                        estimatedSwapInput: updated.swapAmountIn,
+                        requiredWalletWei: "0",
+                      }
+                    : undefined,
+                }
+              : previous,
+          );
+          setDestinationQuoteUpdated(true);
+          showNotification({
+            type: "info",
+            title: "Destination quote updated",
+            message: `Bridge settled. Refreshed output: ${formatUnits(BigInt(updated.tokenOut), outputDecimals ?? 18)} ${outputSymbol ?? "tokens"}. Review the new amount in your wallet.`,
+            chainId: destinationChainIdNumber,
+            autoHide: true,
+          });
+        },
         // Prefer one user-paid EIP-5792 request for each stage, while allowing
         // wallets without that optional RPC method to confirm the same calls
         // sequentially. The destination v4 calls remain gated on settlement.
@@ -1180,7 +1173,10 @@ export default function BalancePage() {
               {dexRoute !== "tesoro-staging-eth-toro-v4" && quoteResult && (
                 <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2">
                   <div className="text-sm font-medium text-gray-300">
-                    Quote Result
+                    Quote Result{" "}
+                    {destinationQuoteUpdated
+                      ? "(updated after bridge)"
+                      : "(estimate before bridge)"}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
@@ -1192,9 +1188,46 @@ export default function BalancePage() {
                     <div>
                       <span className="text-gray-500">tokenOut:</span>{" "}
                       <span className="text-gray-200 font-mono">
-                        {quoteResult.tokenOut ?? "—"}
+                        {quoteResult.tokenOut && quoteResult.outputTokenAddress
+                          ? `${formatUnits(BigInt(quoteResult.tokenOut), outputDecimals ?? 18)} ${outputSymbol ?? "tokens"} (${quoteResult.outputTokenAddress})`
+                          : (quoteResult.tokenOut ?? "—")}
                       </span>
                     </div>
+                    {quoteResult.minimumTokenOut && (
+                      <div className="col-span-2 text-gray-300">
+                        Minimum output at execution:{" "}
+                        {formatUnits(
+                          BigInt(quoteResult.minimumTokenOut),
+                          outputDecimals ?? 18,
+                        )}{" "}
+                        {outputSymbol ?? "tokens"}.
+                      </div>
+                    )}
+                    {quoteResult.destinationGas && (
+                      <div className="col-span-2 text-gray-300">
+                        Destination gas:{" "}
+                        {formatEther(
+                          BigInt(quoteResult.destinationGas.budgetWei),
+                        )}{" "}
+                        ETH budget;{" "}
+                        {formatEther(
+                          BigInt(quoteResult.destinationGas.reserveWei),
+                        )}{" "}
+                        ETH reserved from bridge delivery.
+                        {BigInt(quoteResult.destinationGas.requiredWalletWei) >
+                          0n && (
+                          <span className="block text-yellow-400">
+                            Fund the destination wallet with at least{" "}
+                            {formatEther(
+                              BigInt(
+                                quoteResult.destinationGas.requiredWalletWei,
+                              ),
+                            )}{" "}
+                            ETH for gas before executing.
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <span className="text-gray-500">
                         resourceLockRequired:
@@ -1248,10 +1281,9 @@ export default function BalancePage() {
                         {quoteResult.externalExecution.destinationSwap
                           ?.chainId === robinhood.id && (
                           <div className="mt-1">
-                            {quoteResult.externalExecution.lifi.bridgeToken.toLowerCase() ===
-                            zeroAddress
-                              ? "Before bridging, the demo prices gas for at least three Robinhood calls. Any shortfall in your Robinhood wallet is reserved from the bridge delivery; the displayed output quote is before this reserve."
-                              : "Before bridging, the demo checks that your Robinhood wallet holds enough ETH for at least three destination calls. If not, it asks you to fund that wallet."}
+                            The SDK includes destination gas in the quoted
+                            output and refreshes the swap after bridge
+                            settlement.
                           </div>
                         )}
                       </div>
