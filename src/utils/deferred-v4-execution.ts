@@ -1,4 +1,5 @@
 type DeferredV4Quote = {
+  transactions?: unknown;
   externalExecution?: {
     provider?: unknown;
     destinationSwap?: {
@@ -7,6 +8,26 @@ type DeferredV4Quote = {
     };
   };
 };
+
+/** Same-chain quotes execute their swap immediately; cross-chain quotes need the deferred leg. */
+export function requireV4QuoteExecution(
+  quote: DeferredV4Quote,
+  sourceChainId: number,
+  destinationChainId: number,
+): DeferredV4Execution | undefined {
+  if (
+    sourceChainId === destinationChainId &&
+    !quote.externalExecution?.destinationSwap
+  ) {
+    if (!Array.isArray(quote.transactions) || quote.transactions.length === 0) {
+      throw new Error(
+        "The same-chain swap quote did not include executable transactions.",
+      );
+    }
+    return undefined;
+  }
+  return requireDeferredV4Execution(quote);
+}
 
 export type DeferredV4Execution = {
   chainId: number;
@@ -23,6 +44,8 @@ export function requireDeferredV4Execution(
 ): DeferredV4Execution {
   const destinationSwap = quote.externalExecution?.destinationSwap;
   const transactions = destinationSwap?.executionTransactions;
+  console.log("destinationSwap", destinationSwap);
+  console.log("transactions", transactions);
   if (
     !destinationSwap ||
     !Number.isSafeInteger(destinationSwap.chainId) ||
