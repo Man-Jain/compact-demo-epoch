@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
+import {
+  createPublicClient,
+  formatEther,
+  http,
+  parseUnits,
+  zeroAddress,
+} from "viem";
+import { robinhood } from "viem/chains";
 import { useNotification } from "../hooks/useNotification";
 import { useEffectiveWallet } from "../hooks/useEffectiveWallet";
 import { useAllocatorAPI } from "../hooks/useAllocatorAPI";
@@ -16,6 +23,7 @@ import { UserBalancesList } from "../components/UserBalancesList";
 import { WalletConnect } from "../components/WalletConnect";
 import { GaslessCheckbox } from "../components/GaslessCheckbox";
 import { Wallet7702StatusPanel } from "../components/Wallet7702StatusPanel";
+import { TesoroStagingSwap } from "../components/TesoroStagingSwap";
 import { useGaslessWallet } from "../hooks/useGaslessWallet";
 import { isInjectedWallet } from "../gasless/wallet-capability";
 import { config as apiConfig } from "../config/api";
@@ -32,12 +40,28 @@ import {
   EXECUTION_STATUS_NOTIFICATION_ID,
   getExecutionStatusNotification,
 } from "../utils/executionStatusNotifications";
+import { createSolveCompletionNotification } from "../utils/solveCompletionNotification";
+import { createQuoteRequestGate } from "../utils/quote-request-gate";
+import { canRequestQuote } from "../utils/quote-eligibility";
+import { requireV4QuoteExecution } from "../utils/deferred-v4-execution";
+import { externalV4BatchOptions } from "../utils/external-v4-batch-mode";
+import { destinationGasBudget } from "../utils/destination-gas";
 import { ERC20_ABI } from "../constants/contracts";
 import {
   getTokensForChain,
   getChainsFromGraph,
   isTestnetChain,
 } from "../config/web3";
+import {
+  buildDexRouteExtraData,
+  DEX_ROUTE_OPTIONS,
+  EXTERNAL_PROVIDER_OPTIONS,
+  getDexRouteTestConfig,
+  getDexTestTokens,
+  getFixedV4DestinationTokens,
+  type DexRouteId,
+  type ExternalProviderSelection,
+} from "../config/dex-pools";
 
 interface IntentTransactionStatus {
   status: string;
@@ -119,7 +143,7 @@ export default function BalancePage() {
   } = useEffectiveWallet();
   const { setChainId: setLocalChainId } = useLocalSigner();
   const { showNotification } = useNotification();
-  const { allocatorAddress } = useAllocatorAPI();
+  const { allocatorAddress, error: allocatorError } = useAllocatorAPI();
   const { supportedChains } = useChainConfig();
   const { isConfirming } = useCompact();
   const { writeContractAsync } = useWriteContract();
@@ -152,9 +176,17 @@ export default function BalancePage() {
     null,
   );
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const quoteRequestGateRef = useRef(createQuoteRequestGate());
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [routingPreset, setRoutingPreset] = useState<RoutingPreset>("any");
+  const [externalProvider, setExternalProvider] =
+    useState<ExternalProviderSelection>("any");
   const [customSolverAddresses, setCustomSolverAddresses] = useState("");
+  const [dexRoute, setDexRoute] = useState<DexRouteId>("automatic-v3");
+  const dexRouteTestConfig = useMemo(
+    () => getDexRouteTestConfig(dexRoute),
+    [dexRoute],
+  );
 
   const routingAndLiquidityOptions = useMemo(
     () => buildRoutingAndLiquidityOptions(routingPreset, customSolverAddresses),
@@ -183,17 +215,51 @@ export default function BalancePage() {
 
   // Tokens for current (source) chain; deposit and faucet use this
   const graphTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
+  const erc20Tokens = useMemo(
+    () =>
+      graphTokens.filter(
+        (token) => token.address.toLowerCase() !== zeroAddress,
+      ),
+    [graphTokens],
+  );
   const destinationChains = useMemo(
     () => getChainsFromGraph(chainId),
     [chainId],
   );
+  const destinationChainIdNumber = destinationChainId
+    ? parseInt(destinationChainId, 10)
+    : undefined;
   // Output token options = tokens on the selected destination chain
   const outputTokenOptions = useMemo(() => {
     if (!destinationChainId) return [];
     const id = parseInt(destinationChainId, 10);
     if (Number.isNaN(id)) return [];
-    return getTokensForChain(id);
+    return getTokensForChain(id).filter(
+      (token) => token.address.toLowerCase() !== zeroAddress,
+    );
   }, [destinationChainId]);
+  const inputTokenSuggestions = useMemo(() => {
+    return [...erc20Tokens, ...getDexTestTokens(chainId)];
+  }, [chainId, erc20Tokens]);
+  const outputTokenSuggestions = useMemo(() => {
+    const fixedRouteTokens = destinationChainIdNumber
+      ? getFixedV4DestinationTokens(destinationChainIdNumber)
+      : [];
+    const fallback = [
+      ...outputTokenOptions,
+      ...(destinationChainIdNumber
+        ? getDexTestTokens(destinationChainIdNumber)
+        : []),
+      ...fixedRouteTokens,
+    ];
+    return fallback.filter(
+      (token, index) =>
+        fallback.findIndex(
+          (candidate) =>
+            candidate.address.toLowerCase() === token.address.toLowerCase(),
+        ) === index,
+    );
+  }, [destinationChainIdNumber, outputTokenOptions]);
 
   const prevSourceChainRef = useRef<number | null>(null);
   const prevDestinationChainRef = useRef<string | null>(null);
@@ -202,17 +268,24 @@ export default function BalancePage() {
   useEffect(() => {
     if (prevSourceChainRef.current === chainId) return;
     prevSourceChainRef.current = chainId;
-    if (graphTokens.length === 0) return;
-    setDepositTokenAddress(graphTokens[0].address);
-    setFaucetToken(graphTokens[0].address);
-  }, [chainId, graphTokens]);
+    if (erc20Tokens.length === 0) return;
+    setDepositTokenAddress(erc20Tokens[0].address);
+    setFaucetToken(erc20Tokens[0].address);
+  }, [chainId, erc20Tokens]);
 
   useEffect(() => {
     if (prevDestinationChainRef.current === destinationChainId) return;
     prevDestinationChainRef.current = destinationChainId;
+    if (
+      dexRouteTestConfig &&
+      destinationChainId === dexRouteTestConfig.destinationChainId.toString()
+    ) {
+      setOutputTokenAddress(dexRouteTestConfig.tokenOut.address);
+      return;
+    }
     if (outputTokenOptions.length === 0) return;
     setOutputTokenAddress(outputTokenOptions[0].address);
-  }, [destinationChainId, outputTokenOptions]);
+  }, [destinationChainId, dexRouteTestConfig, outputTokenOptions]);
 
   useEffect(() => {
     if (destinationChains.length === 0) return;
@@ -223,10 +296,6 @@ export default function BalancePage() {
       setDestinationChainId(destinationChains[0].chainId.toString());
     }
   }, [chainId, destinationChains]);
-
-  const destinationChainIdNumber = destinationChainId
-    ? parseInt(destinationChainId, 10)
-    : undefined;
 
   const {
     isValid: isValidDeposit,
@@ -251,10 +320,9 @@ export default function BalancePage() {
     checksumAddress: outputChecksumAddress,
     resolutionError: outputResolutionError,
     source: outputSource,
-  } = useTokenOnChain(
-    tokenType === "erc20" ? destinationChainIdNumber : undefined,
-    tokenType === "erc20" ? outputTokenAddress : undefined,
-  );
+  } = useTokenOnChain(destinationChainIdNumber, outputTokenAddress);
+  const sourceTokenAddress =
+    tokenType === "native" ? zeroAddress : depositChecksumAddress;
 
   // const { solveWithSolver, isLoading: isLoadingSolveWithSolver } =
   //   useSolveWithSolver();
@@ -291,20 +359,19 @@ export default function BalancePage() {
     if (!isConnected || !address || !allocatorAddress) return false;
     if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
     if (!outputAmount || isNaN(Number(outputAmount))) return false;
+    if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
+      return false;
+    if (outputDecimals === undefined) return false;
     if (tokenType === "erc20") {
-      if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
-        return false;
       if (!depositChecksumAddress || !isValidDeposit || isLoadingDeposit)
         return false;
-      if (outputDecimals === undefined) return false;
       if (depositDecimals === undefined) return false;
-
-      try {
-        const parts = outputAmount.split(".");
-        if (parts.length > 1 && parts[1].length > outputDecimals) return false;
-      } catch {
-        return false;
-      }
+    }
+    try {
+      const parts = outputAmount.split(".");
+      if (parts.length > 1 && parts[1].length > outputDecimals) return false;
+    } catch {
+      return false;
     }
     return true;
   }, [
@@ -325,28 +392,29 @@ export default function BalancePage() {
   ]);
 
   const canFetchQuote = useMemo(() => {
-    if (!walletClient || !address || !allocatorAddress) return false;
-    if (!inputAmountDisplay || isNaN(Number(inputAmountDisplay))) return false;
-    if (!outputAmount || isNaN(Number(outputAmount))) return false;
-    if (
-      routingPreset === "custom" &&
-      !isValidCustomSolverInput(customSolverAddresses)
-    ) {
-      return false;
-    }
-    if (tokenType === "erc20") {
-      if (!outputChecksumAddress || !isValidOutput || isLoadingOutput)
-        return false;
-      if (!depositChecksumAddress || !isValidDeposit || isLoadingDeposit)
-        return false;
-      if (outputDecimals === undefined) return false;
-      if (depositDecimals === undefined) return false;
-    }
-    return true;
+    return canRequestQuote({
+      connected: isConnected,
+      address,
+      allocatorAddress,
+      sourceChainId: chainId,
+      inputAmount: inputAmountDisplay,
+      outputAmount,
+      tokenType,
+      outputResolved:
+        Boolean(outputChecksumAddress) && isValidOutput && !isLoadingOutput,
+      depositResolved:
+        Boolean(depositChecksumAddress) && isValidDeposit && !isLoadingDeposit,
+      outputDecimals,
+      depositDecimals,
+      customRoutingValid:
+        routingPreset !== "custom" ||
+        isValidCustomSolverInput(customSolverAddresses),
+    });
   }, [
-    walletClient,
+    isConnected,
     address,
     allocatorAddress,
+    chainId,
     inputAmountDisplay,
     outputAmount,
     tokenType,
@@ -362,21 +430,51 @@ export default function BalancePage() {
     customSolverAddresses,
   ]);
 
+  useEffect(() => {
+    if (quoteRequestGateRef.current.invalidate()) {
+      setIsLoadingQuote(false);
+    }
+  }, [
+    chainId,
+    customSolverAddresses,
+    depositTokenAddress,
+    destinationChainId,
+    dexRoute,
+    externalProvider,
+    inputAmountDisplay,
+    outputAmount,
+    outputTokenAddress,
+    routingPreset,
+    tokenType,
+  ]);
+
   const fetchIntentQuote = async () => {
     if (!canFetchQuote) return;
+    const requestId = quoteRequestGateRef.current.begin();
     setIsLoadingQuote(true);
     setQuoteResult(null);
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: dexRoute,
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: sourceTokenAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
+      // Quote construction only reads the active chain id. Some injected
+      // wallets briefly expose account/chain state before wagmi resolves its
+      // WalletClient, so retain quote availability during that transition.
+      const quoteWalletClient =
+        walletClient ?? ({ chain: { id: chainId } } as any);
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
-        walletClient: walletClient as any,
+        walletClient: quoteWalletClient as any,
       });
 
       const { taskTypeString, intentData } = await epochSdk.getTaskData({
         taskType: TaskType.GetTokenOut,
         intentData: {
           isNative: tokenType === "native",
-          depositTokenAddress: depositChecksumAddress!,
+          depositTokenAddress: sourceTokenAddress!,
           tokenInAmount: parseUnits(
             inputAmountDisplay || "0",
             depositDecimals ?? 18,
@@ -391,10 +489,10 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
+        ...(externalProvider === "any"
+          ? {}
+          : { externalQuoteProviders: [externalProvider] }),
       });
 
       const result = await epochSdk.getIntentQuote({
@@ -405,16 +503,27 @@ export default function BalancePage() {
         routingAndLiquidityOptions,
       });
 
+      const deferredV4Execution =
+        dexRoute === "automatic-v3"
+          ? undefined
+          : requireV4QuoteExecution(result, chainId, destinationChainIdNumber!);
+
+      if (!quoteRequestGateRef.current.isCurrent(requestId)) return;
+
       setQuoteResult(result);
 
       showNotification({
         type: "success",
         title: "Quote Retrieved",
-        message: `Expected output: ${result.tokenOut ?? "—"} (raw)`,
+        message: deferredV4Execution
+          ? `Expected output: ${result.tokenOut ?? "—"} (raw). After LI.FI settles, sign ${deferredV4Execution.transactionCount} Robinhood transaction(s) on chain ${deferredV4Execution.chainId}.`
+          : `Expected output: ${result.tokenOut ?? "—"} (raw)`,
         chainId,
         autoHide: true,
       });
     } catch (error) {
+      if (!quoteRequestGateRef.current.isCurrent(requestId)) return;
+
       showNotification({
         type: "error",
         title: "Quote Failed",
@@ -422,7 +531,9 @@ export default function BalancePage() {
         chainId,
       });
     } finally {
-      setIsLoadingQuote(false);
+      if (quoteRequestGateRef.current.complete(requestId)) {
+        setIsLoadingQuote(false);
+      }
     }
   };
 
@@ -433,14 +544,32 @@ export default function BalancePage() {
       isFirstQuoteInputChange.current = false;
       return;
     }
-    if (!canFetchQuote || isLoadingQuote || isConfirming) return;
+    if (!canFetchQuote || isConfirming) return;
     void fetchIntentQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on quote-driving inputs
-  }, [inputAmount, routingPreset, customSolverAddresses]);
+  }, [
+    inputAmount,
+    routingPreset,
+    customSolverAddresses,
+    dexRoute,
+    externalProvider,
+    chainId,
+    destinationChainId,
+    depositTokenAddress,
+    outputTokenAddress,
+    outputAmount,
+    tokenType,
+  ]);
 
   const onSubmit = async () => {
     if (!isFormValid) return;
     try {
+      const dexRouteExtraData = buildDexRouteExtraData({
+        route: dexRoute,
+        destinationChainId: destinationChainIdNumber,
+        tokenIn: sourceTokenAddress!,
+        tokenOut: outputChecksumAddress!,
+      });
       const epochSdk = new EpochIntentSDK({
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
         walletClient: walletClient as any,
@@ -450,7 +579,7 @@ export default function BalancePage() {
         taskType: TaskType.GetTokenOut,
         intentData: {
           isNative: tokenType === "native",
-          depositTokenAddress: depositChecksumAddress!,
+          depositTokenAddress: sourceTokenAddress!,
           tokenInAmount: parseUnits(
             inputAmountDisplay || "0",
             depositDecimals ?? 18,
@@ -465,10 +594,10 @@ export default function BalancePage() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
           recipient: address as `0x${string}`,
         },
-        extraDataTypestring: "uint256 somethingKey",
-        extraData: {
-          somethingKey: "123",
-        },
+        ...dexRouteExtraData,
+        ...(externalProvider === "any"
+          ? {}
+          : { externalQuoteProviders: [externalProvider] }),
       });
 
       console.log("taskTypeString: ", taskTypeString);
@@ -482,6 +611,45 @@ export default function BalancePage() {
           chainId,
         });
         return;
+      }
+
+      if (dexRoute !== "automatic-v3") {
+        requireV4QuoteExecution(
+          quoteResult,
+          chainId,
+          destinationChainIdNumber!,
+        );
+      }
+
+      let destinationGasReserveWei: string | undefined;
+      const externalPlan = quoteResult.externalExecution;
+      if (externalPlan?.destinationSwap?.chainId === robinhood.id) {
+        const destinationClient = createPublicClient({
+          chain: robinhood,
+          transport: http(robinhood.rpcUrls.default.http[0]),
+        });
+        const [gasPriceWei, walletBalanceWei] = await Promise.all([
+          destinationClient.getGasPrice(),
+          destinationClient.getBalance({ address: address as `0x${string}` }),
+        ]);
+        const budget = destinationGasBudget({
+          bridgeToken: externalPlan.lifi.bridgeToken,
+          estimatedBridgeAmount: externalPlan.destinationSwap.amountIn
+            ? BigInt(externalPlan.destinationSwap.amountIn)
+            : undefined,
+          gasPriceWei,
+          transactionCount:
+            externalPlan.destinationSwap.executionTransactions.length,
+          walletBalanceWei,
+        });
+        if (budget.requiredWalletWei > 0n) {
+          throw new Error(
+            `Add at least ${formatEther(budget.requiredWalletWei)} ETH to ${address} on Robinhood for three destination transactions, then try again.`,
+          );
+        }
+        if (budget.reserveWei > 0n) {
+          destinationGasReserveWei = budget.reserveWei.toString();
+        }
       }
 
       const useGasless = effectiveAllowGasless && gasless;
@@ -519,8 +687,15 @@ export default function BalancePage() {
         taskTypeString,
         intentData,
         quoteResult,
+        ...(destinationGasReserveWei ? { destinationGasReserveWei } : {}),
         routingAndLiquidityOptions,
         onExecutionStatus: reportExecutionStatus,
+        // Prefer one user-paid EIP-5792 request for each stage, while allowing
+        // wallets without that optional RPC method to confirm the same calls
+        // sequentially. The destination v4 calls remain gated on settlement.
+        ...(dexRoute === "automatic-v3"
+          ? { batchMode: "auto" as const, allowSequentialFallback: true }
+          : externalV4BatchOptions()),
         allowGaslessSmartAccount: useGasless,
         gasless: useGasless,
       };
@@ -533,13 +708,10 @@ export default function BalancePage() {
       }
 
       showNotification({
-        type: "success",
-        title: "Deposit + Register + Allocation",
-        message: data?.gaslessUsed
-          ? "Gasless deposit submitted, compact registered, and allocation created"
-          : "Deposit submitted, compact registered, and allocation created",
+        ...createSolveCompletionNotification({
+          gaslessUsed: data?.gaslessUsed,
+        }),
         chainId,
-        autoHide: true,
       });
     } catch (error) {
       showNotification({
@@ -547,6 +719,7 @@ export default function BalancePage() {
         title: "Action Failed",
         message: error instanceof Error ? error.message : "Failed to submit",
         chainId,
+        txHash: EXECUTION_STATUS_NOTIFICATION_ID,
       });
     }
   };
@@ -766,27 +939,31 @@ export default function BalancePage() {
                 </button>
               </div>
 
-              {tokenType === "erc20" && (
-                <TokenAddressInput
-                  label="Output Token Address (destination chain)"
-                  value={outputTokenAddress}
-                  onChange={setOutputTokenAddress}
-                  suggestions={outputTokenOptions}
-                  symbol={outputSymbol}
-                  decimals={outputDecimals}
-                  isLoading={isLoadingOutput}
-                  isResolved={isValidOutput}
-                  resolutionError={outputResolutionError}
-                  source={outputSource}
-                />
-              )}
+              <TokenAddressInput
+                label="Output Token Address (destination chain)"
+                value={outputTokenAddress}
+                onChange={(value) => {
+                  setOutputTokenAddress(value);
+                  setQuoteResult(null);
+                }}
+                suggestions={outputTokenSuggestions}
+                symbol={outputSymbol}
+                decimals={outputDecimals}
+                isLoading={isLoadingOutput}
+                isResolved={isValidOutput}
+                resolutionError={outputResolutionError}
+                source={outputSource}
+              />
 
               {tokenType === "erc20" && (
                 <TokenAddressInput
                   label="Input Token Address (source chain)"
                   value={depositTokenAddress}
-                  onChange={setDepositTokenAddress}
-                  suggestions={graphTokens}
+                  onChange={(value) => {
+                    setDepositTokenAddress(value);
+                    setQuoteResult(null);
+                  }}
+                  suggestions={inputTokenSuggestions}
                   symbol={depositSymbol}
                   decimals={depositDecimals}
                   balance={depositBalance}
@@ -803,7 +980,10 @@ export default function BalancePage() {
                 </label>
                 <select
                   value={destinationChainId}
-                  onChange={(e) => setDestinationChainId(e.target.value)}
+                  onChange={(e) => {
+                    setDestinationChainId(e.target.value);
+                    setQuoteResult(null);
+                  }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                 >
                   {destinationChains.map((chain) => (
@@ -844,6 +1024,36 @@ export default function BalancePage() {
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  External Quote Provider
+                </label>
+                <select
+                  value={externalProvider}
+                  onChange={(event) => {
+                    const provider = event.target
+                      .value as ExternalProviderSelection;
+                    setExternalProvider(provider);
+                    if (provider !== "any") {
+                      setRoutingPreset("external-multi-transactions");
+                    }
+                    setQuoteResult(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  {EXTERNAL_PROVIDER_OPTIONS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  LI.FI is signed by the SDK when no provider is selected. A
+                  specific selection is passed to the SDK as a one-provider list
+                  and uses the external multi-transaction solver.
+                </p>
+              </div>
+
               {routingPreset === "custom" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -865,34 +1075,109 @@ export default function BalancePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Minimum Output Amount
-                  </label>
-                  <input
-                    type="text"
-                    value={outputAmount}
-                    onChange={(e) => setOutputAmount(e.target.value)}
-                    placeholder="0.0"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Input Amount
-                  </label>
-                  <input
-                    type="text"
-                    value={inputAmountDisplay}
-                    onChange={(e) => setInputAmountDisplay(e.target.value)}
-                    placeholder="0.0"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  DEX Pool Route
+                </label>
+                <select
+                  value={dexRoute}
+                  onChange={(event) => {
+                    const nextRoute = event.target.value as DexRouteId;
+                    setDexRoute(nextRoute);
+                    const nextTestConfig = getDexRouteTestConfig(nextRoute);
+                    if (
+                      nextTestConfig &&
+                      nextRoute !== "tesoro-staging-eth-toro-v4"
+                    ) {
+                      setExternalProvider("lifi");
+                      setRoutingPreset("external-multi-transactions");
+                    } else if (nextRoute === "ethereum-mainnet-stablepair-v4") {
+                      setRoutingPreset("external-multi-transactions");
+                    }
+                    if (
+                      nextTestConfig &&
+                      nextRoute !== "tesoro-staging-eth-toro-v4"
+                    ) {
+                      setDestinationChainId(
+                        nextTestConfig.destinationChainId.toString(),
+                      );
+                      if (
+                        inputTokenSuggestions.some(
+                          (token) =>
+                            token.address.toLowerCase() ===
+                            nextTestConfig.tokenIn.address.toLowerCase(),
+                        )
+                      ) {
+                        setDepositTokenAddress(nextTestConfig.tokenIn.address);
+                      }
+                      setOutputTokenAddress(nextTestConfig.tokenOut.address);
+                    }
+                    setQuoteResult(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                >
+                  {DEX_ROUTE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {
+                    DEX_ROUTE_OPTIONS.find((option) => option.id === dexRoute)
+                      ?.description
+                  }
+                </p>
+                {dexRouteTestConfig && (
+                  <p className="mt-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-xs leading-relaxed text-gray-300">
+                    {chainId === destinationChainIdNumber &&
+                    dexRoute !== "tesoro-staging-eth-toro-v4"
+                      ? "Source and destination are on the same chain. The solver quotes the selected v4 PoolKey and hook directly and returns swap transactions for this chain. If the selected pool cannot quote, it reports an error."
+                      : dexRouteTestConfig.testingInstructions}
+                  </p>
+                )}
               </div>
 
-              {quoteResult && (
+              {dexRoute === "tesoro-staging-eth-toro-v4" && (
+                <TesoroStagingSwap />
+              )}
+
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Minimum Output Amount
+                    </label>
+                    <input
+                      type="text"
+                      value={outputAmount}
+                      onChange={(e) => {
+                        setOutputAmount(e.target.value);
+                        setQuoteResult(null);
+                      }}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Input Amount
+                    </label>
+                    <input
+                      type="text"
+                      value={inputAmountDisplay}
+                      onChange={(e) => {
+                        setInputAmountDisplay(e.target.value);
+                        setQuoteResult(null);
+                      }}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && quoteResult && (
                 <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-2">
                   <div className="text-sm font-medium text-gray-300">
                     Quote Result
@@ -922,6 +1207,55 @@ export default function BalancePage() {
                       <span className="text-gray-500">routing:</span>{" "}
                       <span className="text-gray-200">{routingPreset}</span>
                     </div>
+                    {quoteResult.externalExecution && (
+                      <div className="col-span-2 rounded border border-[#00ff00]/25 bg-[#00ff00]/5 p-2 text-gray-300">
+                        <div className="font-medium text-[#00ff00]">
+                          {quoteResult.externalExecution.provider ?? "External"}{" "}
+                          execution plan
+                        </div>
+                        <div className="mt-1">
+                          {
+                            quoteResult.externalExecution.sourceTransactions
+                              .length
+                          }{" "}
+                          source call(s) on chain{" "}
+                          {quoteResult.externalExecution.sourceChainId}. Your
+                          wallet will offer one user-paid EIP-5792 batch when
+                          supported. Otherwise, it will request the source calls
+                          individually and in order.{" "}
+                          {quoteResult.externalExecution.sourceChainId ===
+                          quoteResult.externalExecution.lifi.destinationChainId
+                            ? "This is a same-chain swap; there is no bridge settlement or deferred destination batch."
+                            : "The destination v4 calldata is refreshed only after bridge settlement."}
+                        </div>
+                        {quoteResult.externalExecution.destinationSwap && (
+                          <div className="mt-1">
+                            Then the wallet will offer a separate user-paid
+                            batch when supported, otherwise individual
+                            confirmations, for{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .executionTransactions.length
+                            }{" "}
+                            destination transaction(s) on chain{" "}
+                            {
+                              quoteResult.externalExecution.destinationSwap
+                                .chainId
+                            }
+                            .
+                          </div>
+                        )}
+                        {quoteResult.externalExecution.destinationSwap
+                          ?.chainId === robinhood.id && (
+                          <div className="mt-1">
+                            {quoteResult.externalExecution.lifi.bridgeToken.toLowerCase() ===
+                            zeroAddress
+                              ? "Before bridging, the demo prices gas for at least three Robinhood calls. Any shortfall in your Robinhood wallet is reserved from the bridge delivery; the displayed output quote is before this reserve."
+                              : "Before bridging, the demo checks that your Robinhood wallet holds enough ETH for at least three destination calls. If not, it asks you to fund that wallet."}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Use tokenOut to tweak Input Amount for expected output.
@@ -929,7 +1263,8 @@ export default function BalancePage() {
                 </div>
               )}
 
-              {effectiveAllowGasless ? (
+              {dexRoute !== "tesoro-staging-eth-toro-v4" &&
+              effectiveAllowGasless ? (
                 <GaslessCheckbox
                   checked={gasless}
                   onChange={setGasless}
@@ -944,23 +1279,59 @@ export default function BalancePage() {
                 />
               ) : null}
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={fetchIntentQuote}
-                  disabled={!canFetchQuote || isLoadingQuote || isConfirming}
-                  className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoadingQuote ? "Loading Quote..." : "Get Quote"}
-                </button>
-                <button
-                  onClick={onSubmit}
-                  disabled={!isFormValid || isConfirming}
-                  className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isConfirming ? "Submitting..." : "Deposit + Submit Intent"}
-                </button>
-              </div>
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={fetchIntentQuote}
+                    disabled={!canFetchQuote || isLoadingQuote || isConfirming}
+                    className="flex-1 py-2 px-4 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingQuote
+                      ? "Loading Quote..."
+                      : dexRoute === "robinhood-weth-pport-v4"
+                        ? "Get LI.FI + PPORT Quote"
+                        : dexRoute === "robinhood-ai-usdg-v4"
+                          ? "Get LI.FI + AI Quote"
+                          : "Get Quote"}
+                  </button>
+                  <button
+                    onClick={onSubmit}
+                    disabled={!isFormValid || !walletClient || isConfirming}
+                    className="flex-1 py-2 px-4 bg-[#00ff00] text-gray-900 rounded-lg font-medium hover:bg-[#00dd00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isConfirming
+                      ? "Executing..."
+                      : dexRoute === "robinhood-weth-pport-v4"
+                        ? "Execute LI.FI + PPORT Route"
+                        : dexRoute === "robinhood-ai-usdg-v4"
+                          ? "Execute LI.FI + AI Route"
+                          : "Deposit + Submit Intent"}
+                  </button>
+                </div>
+              )}
+              {dexRoute !== "tesoro-staging-eth-toro-v4" && !canFetchQuote && (
+                <p className="text-xs text-yellow-400">
+                  {!isConnected || !address
+                    ? "Connect a wallet to get a quote."
+                    : !allocatorAddress
+                      ? `Allocator unavailable${allocatorError ? `: ${allocatorError}` : ""}. Retrying automatically.`
+                      : tokenType === "erc20" &&
+                          (!depositChecksumAddress ||
+                            !isValidDeposit ||
+                            isLoadingDeposit)
+                        ? "Waiting for the source token address to resolve."
+                        : !outputChecksumAddress ||
+                            !isValidOutput ||
+                            isLoadingOutput
+                          ? "Waiting for the destination token address to resolve."
+                          : outputDecimals === undefined ||
+                              (tokenType === "erc20" &&
+                                depositDecimals === undefined)
+                            ? "Waiting for token decimals from the selected chains."
+                            : "Check the amount and routing selection before getting a quote."}
+                </p>
+              )}
             </div>
             <div>
               <AccountResourceLockBalances />
@@ -990,7 +1361,7 @@ export default function BalancePage() {
                     onChange={(e) => setFaucetToken(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 focus:outline-none focus:border-[#00ff00]"
                   >
-                    {graphTokens.map((token) => (
+                    {erc20Tokens.map((token) => (
                       <option key={token.address} value={token.address}>
                         {token.symbol}
                       </option>

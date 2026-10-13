@@ -55,6 +55,8 @@ export function useAllocatorAPI() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const fetchHealthCheck = async () => {
       try {
         const response = await fetch(getApiUrl("/health"));
@@ -69,21 +71,28 @@ export function useAllocatorAPI() {
             `Allocator address not configured for chain ${chainId}`,
           );
         }
+        if (cancelled) return;
         setAllocatorAddress(resolved);
         setError(null);
       } catch (err) {
+        if (cancelled) return;
         setError(
           err instanceof Error
             ? err.message
             : "Failed to fetch allocator address",
         );
         setAllocatorAddress(null);
+        retryTimer = setTimeout(fetchHealthCheck, 5000);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchHealthCheck();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [chainId]);
 
   const createAllocation = async (

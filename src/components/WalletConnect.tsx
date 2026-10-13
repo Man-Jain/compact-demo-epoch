@@ -7,6 +7,10 @@ import {
   useLocalSigner,
 } from "../context/LocalSignerContext";
 import { formatAddress } from "../utils/formatting";
+import {
+  WALLETCONNECT_ERROR_EVENT,
+  walletConnectSubscriptionFailed,
+} from "../utils/walletConnectErrors";
 
 interface WalletConnectProps {
   hasSession: boolean;
@@ -21,6 +25,9 @@ export function WalletConnect({ hasSession }: WalletConnectProps) {
     DEFAULT_LOCAL_CHAIN_ID,
   );
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [walletConnectError, setWalletConnectError] = useState(
+    walletConnectSubscriptionFailed,
+  );
 
   const { isConnected: wagmiConnected } = useAccount();
   const { disconnect: wagmiDisconnect } = useDisconnect();
@@ -31,6 +38,13 @@ export function WalletConnect({ hasSession }: WalletConnectProps) {
       local.disconnect();
     }
   }, [wagmiConnected, local.isLocalConnected, local.disconnect]);
+
+  useEffect(() => {
+    const showError = () => setWalletConnectError(true);
+    window.addEventListener(WALLETCONNECT_ERROR_EVENT, showError);
+    return () =>
+      window.removeEventListener(WALLETCONNECT_ERROR_EVENT, showError);
+  }, []);
 
   const handleLocalConnect = () => {
     const ok = local.connect(privateKeyInput, localChainId);
@@ -111,12 +125,20 @@ export function WalletConnect({ hasSession }: WalletConnectProps) {
       </div>
 
       {tab === "browser" ? (
-        <div className="flex justify-end">
-          <ConnectButton
-            showBalance={hasSession}
-            accountStatus={{ smallScreen: "avatar", largeScreen: "full" }}
-            chainStatus={{ smallScreen: "icon", largeScreen: "full" }}
-          />
+        <div>
+          <div className="flex justify-end">
+            <ConnectButton
+              showBalance={hasSession}
+              accountStatus={{ smallScreen: "avatar", largeScreen: "full" }}
+              chainStatus={{ smallScreen: "icon", largeScreen: "full" }}
+            />
+          </div>
+          {walletConnectError && (
+            <p className="mt-2 text-xs text-red-400" role="alert">
+              WalletConnect is unavailable for this site. Ask the demo operator
+              to check the Reown project origin allowlist.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

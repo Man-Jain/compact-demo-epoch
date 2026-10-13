@@ -11,6 +11,14 @@ import { NotificationProvider } from "./context/NotificationProvider";
 import { LocalSignerProvider } from "./context/LocalSignerContext";
 import { ChainConfigProvider } from "./contexts/ChainConfigContext";
 import { useChainConfig as useChainConfigQuery } from "./hooks/useChainConfig";
+import {
+  installWalletConnectErrorHandler,
+  WALLETCONNECT_ERROR_EVENT,
+} from "./utils/walletConnectErrors";
+
+installWalletConnectErrorHandler(window, () => {
+  window.dispatchEvent(new Event(WALLETCONNECT_ERROR_EVENT));
+});
 
 // Create a client
 const queryClient = new QueryClient({
