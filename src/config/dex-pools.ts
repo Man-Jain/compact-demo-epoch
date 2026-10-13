@@ -43,8 +43,9 @@ export const DEX_ROUTE_OPTIONS: ReadonlyArray<{
 }> = [
   {
     id: "automatic-v3",
-    label: "Automatic Uniswap v3 (default)",
-    description: "Use normal solver discovery and Uniswap v3 fallback.",
+    label: "No pool preference (automatic)",
+    description:
+      "Send no pool preference. With external routing, LI.FI (or your selected provider) chooses the swap or bridge route.",
   },
   {
     id: "base-sepolia-hooked-v4",

@@ -25,11 +25,7 @@ export function canRequestQuote(input: {
     return false;
   }
   if (!input.customRoutingValid) return false;
+  if (!input.outputResolved || input.outputDecimals === undefined) return false;
   if (input.tokenType !== "erc20") return true;
-  return (
-    input.outputResolved &&
-    input.depositResolved &&
-    input.outputDecimals !== undefined &&
-    input.depositDecimals !== undefined
-  );
+  return input.depositResolved && input.depositDecimals !== undefined;
 }
