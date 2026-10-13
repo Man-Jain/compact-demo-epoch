@@ -271,7 +271,7 @@ const FIXED_V4_ROUTES: Record<FixedV4RouteId, FixedV4Route> = {
     },
     autoSelectForOutput: true,
     testingInstructions:
-      "Select TORO to sign the Robinhood mainnet ETH/TORO Tesoro-hook PoolKey. The SDK quotes TORO after destination gas, bridges into native ETH, then refreshes the swap from the confirmed delivery. The input must cover both gas and the swap.",
+      "Select TORO to sign the Robinhood mainnet ETH/TORO Tesoro-hook PoolKey. LI.FI bridges your source asset into native ETH on Robinhood; after settlement, the demo reserves any destination-gas shortfall from the confirmed ETH and swaps the remainder. The input must cover both.",
   },
   "tesoro-staging-eth-toro-v4": {
     destinationChainId: 466300,
